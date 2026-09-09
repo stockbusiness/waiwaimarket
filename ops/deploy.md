@@ -40,18 +40,33 @@
    npx supabase db push
    ```
 
-   `0001_init.sql` から `0007_hq_members.sql` までが順に流れる。
+   `0001_init.sql` から `0008_storefront_and_storage.sql` までが順に流れる。
    `0003` の check 制約と `0006` の外部キーは既存行を検証するので、
    **空のプロジェクトに適用すること。**
 
+   CLI を使わず Supabase の SQL Editor に貼る場合は、`supabase/migrations/` の
+   ファイルを番号順に 1 つずつ実行する。8 ファイルを 1 つに連結して一括で
+   流しても通る（2026-09-09 に実プロジェクトで確認済み）。
+
+   `0008` の Storage ポリシーは `storage.objects` の所有者の都合で SQL Editor から
+   作れない可能性を懸念していたが、実プロジェクトでは問題なく作成できた。
+   万一ここで権限エラーになった場合は、Storage → Policies の UI から
+   同じ条件のポリシーを作る。
+
 3. スキーマを検証する
+
+   **SQL Editor で実行する場合**は `supabase/tests/verify_schema_sql_editor.sql` を
+   貼り付ける。単一の SELECT なのでそのまま動き、6 項目の判定表が返る。
+
+   **psql が使える場合**は、ロールを切り替えて実挙動まで確かめる版がある。
 
    ```bash
    psql "<接続文字列>" -f supabase/tests/verify_schema.sql
    ```
 
-   RLS 無効テーブル 0 件、テナントによる商品の自己承認が拒否、`point_balances` が
-   `security_invoker` の 3 項目が PASS になれば正しい。
+   `verify_schema.sql` は `\set` や `\echo` などの psql メタコマンドを含むため、
+   SQL Editor では `syntax error at or near "\"` になる。SQL Editor では
+   必ず `_sql_editor` の付いたほうを使うこと。
 
 4. 認証のリダイレクト先を登録する（Authentication → URL Configuration）
 
