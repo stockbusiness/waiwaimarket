@@ -98,6 +98,24 @@ const checks = [
     },
   },
   {
+    name: "存在しない店舗ページが 404 を返す",
+    run: async () => {
+      const res = await fetch(`${baseUrl}/stores/no-such-store-xyz`, { redirect: "manual" });
+      return { ok: res.status === 404, detail: `HTTP ${res.status}` };
+    },
+  },
+  {
+    name: "未ログインで /admin/mfa はログイン画面へ飛ぶ",
+    run: async () => {
+      const res = await fetch(`${baseUrl}/admin/mfa`, { redirect: "manual" });
+      const location = res.headers.get("location") ?? "";
+      return {
+        ok: res.status >= 300 && res.status < 400 && location.includes("/admin/login"),
+        detail: `HTTP ${res.status} → ${location || "(なし)"}`,
+      };
+    },
+  },
+  {
     name: "サービスロールキーが配信物に含まれない",
     run: async () => {
       const res = await fetch(`${baseUrl}/`);

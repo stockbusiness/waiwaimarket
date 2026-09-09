@@ -66,14 +66,24 @@ export default async function TenantHome() {
                   Stripe：{stripeDone ? "完了" : "未完了"}／
                   権限：{membership?.role === "owner" ? "管理者" : "担当者"}
                 </p>
-                {membership?.role === "owner" && !stripeDone ? (
-                  <Link
-                    href="/tenant/onboarding"
-                    className="w-fit underline underline-offset-2"
-                  >
-                    Stripe の手続きへ
+                <div className="flex flex-wrap gap-4">
+                  {membership?.role === "owner" && !stripeDone ? (
+                    <Link href="/tenant/onboarding" className="underline underline-offset-2">
+                      Stripe の手続きへ
+                    </Link>
+                  ) : null}
+                  <Link href="/tenant/store" className="underline underline-offset-2">
+                    店舗ページ
                   </Link>
-                ) : null}
+                  {membership?.role === "owner" ? (
+                    <Link
+                      href="/tenant/settings/legal"
+                      className="underline underline-offset-2"
+                    >
+                      事業者情報
+                    </Link>
+                  ) : null}
+                </div>
               </div>
             </li>
           );

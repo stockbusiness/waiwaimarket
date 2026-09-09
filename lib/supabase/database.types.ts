@@ -72,6 +72,34 @@ export type Database = {
         };
         Relationships: [];
       };
+      stores: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          slug: string;
+          display_name: string;
+          description: string | null;
+          logo_path: string | null;
+          is_public: boolean;
+          created_at: string;
+        };
+        Insert: {
+          tenant_id: string;
+          slug: string;
+          display_name: string;
+          description?: string | null;
+          logo_path?: string | null;
+          is_public?: boolean;
+        };
+        Update: {
+          slug?: string;
+          display_name?: string;
+          description?: string | null;
+          logo_path?: string | null;
+          is_public?: boolean;
+        };
+        Relationships: [];
+      };
       tenant_legal_profiles: {
         Row: {
           tenant_id: string;
