@@ -396,3 +396,55 @@ docs 側にも 3 テーブルを追記済み。
 | 本部管理者 | 全件 | 全件 | 全件 |
 
 `verify_schema.sql` の 3 項目は `0006` 適用後も PASS。
+
+---
+
+## 追記: `0007_hq_members.sql`（2026-09-09、フェーズ1 PR A）
+
+本部ユーザーの管理をテーブル化し、`is_hq_admin()` / `is_hq_operator()` の
+判定元を JWT の `app_metadata.role` から `hq_members` へ差し替えた。
+関数名とシグネチャは変えていないため、`0002`〜`0006` のポリシーはそのまま動く。
+
+### 挙動の変化
+
+**`app_metadata.role` に `hq_admin` を詰めても本部権限は得られなくなった。**
+実測でも `is_hq_admin()` / `is_hq_operator()` がともに false を返すことを確認している。
+ロールの唯一の正が `hq_members` になったため、権限の付与は本部管理者による
+テーブル操作（と監査ログ）を必ず経由する。
+
+### 実測結果
+
+| 利用者 | `current_hq_role()` | `is_hq_admin()` | `is_hq_operator()` | 見える `hq_members` |
+|---|---|---|---|---|
+| 本部管理者 | `hq_admin` | t | t | 全 3 件 |
+| 本部オペレーター | `hq_operator` | f | t | 全 3 件 |
+| 退任者（`is_active=false`） | NULL | f | f | 自分の 1 件のみ |
+| 本部でない利用者 | NULL | f | f | 0 件 |
+| 匿名 | NULL | f | — | 0 件 |
+| `app_metadata.role=hq_admin` を詰めた一般利用者 | NULL | **f** | **f** | 0 件 |
+
+あわせて次を確認した。
+
+- 本部オペレーターは `point_rules` を更新できない（0 行）
+- 本部オペレーターは `hq_members` を追加できない（RLS ポリシー違反で拒否）
+- 退任者は自分の行だけ見えるため、無効化された事実を画面に出せる
+- `verify_schema.sql` の 3 項目は `0007` 適用後も PASS
+
+### 初期登録
+
+`hq_members` が空の間は誰も本部管理者になれないため、最初の 1 人だけは
+service_role か psql で登録する必要がある。手順はマイグレーション末尾に記載した。
+
+### アプリ側の検証（PR A）
+
+| 確認項目 | 結果 |
+|---|---|
+| `npm test` | 45 件すべて成功 |
+| `npm run typecheck` | エラーなし（`next typegen` 込み） |
+| `npm run lint` | 指摘なし |
+| `npm run build` | 成功。全 13 経路と Proxy を認識 |
+| サービスロールキーがクライアントバンドルに含まれない | `.next/static` に該当なし |
+| Client Component から `lib/supabase/service.ts` を import | **ビルドが失敗する**（`server-only` が遮断） |
+
+最後の 2 つは docs/05「サービスロールキーをクライアントから取得できない」を
+規約ではなく仕組みで担保できていることの確認である。
