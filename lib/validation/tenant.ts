@@ -32,3 +32,23 @@ export const tenantReviewSchema = z.object({
 });
 
 export type TenantReviewInput = z.infer<typeof tenantReviewSchema>;
+
+/** 店舗ページの編集 */
+export const storeSchema = z.object({
+  slug: z
+    .string()
+    .trim()
+    .min(3)
+    .max(40)
+    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "英小文字・数字・ハイフンで入力してください"),
+  displayName: trimmed(60),
+  description: z.string().trim().max(2000).optional(),
+  isPublic: z.boolean(),
+});
+
+export type StoreInput = z.infer<typeof storeSchema>;
+
+/** 事業者情報（特商法表記）の編集。テナント管理者のみ */
+export const legalProfileSchema = tenantApplicationSchema.omit({ name: true });
+
+export type LegalProfileInput = z.infer<typeof legalProfileSchema>;
