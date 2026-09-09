@@ -338,3 +338,61 @@ psql -d <db> -f supabase/tests/verify_schema.sql
 Supabase 以外で実行する場合は、事前に `auth.uid()` / `auth.jwt()` と
 `anon` / `authenticated` / `service_role` ロール、および public スキーマへの
 GRANT を用意する必要がある。
+
+---
+
+## 追記: `0006_missing_tables.sql`（2026-09-09）
+
+`docs/03_data_model.md` の仕様漏れを補正し、第 7 章 1〜3 の未確定事項を反映した。
+docs 側にも 3 テーブルを追記済み。
+
+### 追加内容
+
+| 対象 | 内容 | 権限 |
+|---|---|---|
+| `stripe_webhook_events` | `event_id` 主キー、`type`、`payload`、`received_at`、`processed_at`、`process_error`、`attempts` | 書き込みは service_role のみ。閲覧は本部管理者のみ |
+| `point_reconciliation_logs` | 実行日、差分有無、差分件数、差分内容、対応状況、対応者、対応日時 | 本部管理者のみ参照・更新 |
+| `product_categories` | `id`、`parent_id`、`name`、`slug`、`sort_order`、`is_active` | 公開読み取り可。書き込みは本部管理者のみ |
+| `pgcrypto` | `public` → `extensions` スキーマへ移動 | — |
+
+`products.category_id` に `on delete set null` の外部キーを張った。
+
+### 確定済みポイントの取消（`earn_confirmed` → `earn_reversal`）
+
+税込 10,000 円の注文に対する基本還元 100pt の遷移を実測した。
+
+| ステップ | 台帳への追記 | available | pending | usable |
+|---|---|---|---|---|
+| 0 | （台帳が空） | 0 | 0 | 0 |
+| 1 | `earn_pending` +100 | 0 | 100 | 0 |
+| 2 | `earn_confirmed` +100 | 100 | 0 | 100 |
+| 3 | `earn_reversal` −40（取消元 = `earn_confirmed`） | **60** | 0 | 60 |
+| 4 | `earn_reversal` −60（取消元 = `earn_confirmed`） | **0** | 0 | 0 |
+
+対比として、確定前の `earn_pending` を取り消した場合は `pending` のみが減り、
+`available` は 0 のまま動かないことも確認した。
+
+台帳は 4 行の追記のみで、既存行の UPDATE / DELETE は発生していない。
+日次照合ビューの `available_difference` は全購入者で 0。
+
+### 制約の拒否（7 件すべて期待どおり拒否）
+
+| # | 試した操作 | 拒否した制約 |
+|---|---|---|
+| 1 | 同一 `event_id` の Webhook 再送 | `stripe_webhook_events_pkey` |
+| 2 | 照合バッチの同日二重実行 | `point_reconciliation_logs_executed_on_key` |
+| 3 | 差分ありなのに件数 0 | `point_recon_difference_consistent` |
+| 4 | 差分ありを対応記録なしで `resolved` に | `point_recon_closed_requires_resolution` |
+| 5 | 存在しないカテゴリーを商品に設定 | `products_category_id_fkey` |
+| 6 | 不正な slug（`Drinks_JP`） | `product_categories_slug_format` |
+| 7 | 自分自身を親カテゴリーに設定 | `product_categories_no_self_parent` |
+
+### ロール別の閲覧範囲
+
+| ロール | `product_categories` | `stripe_webhook_events` | `point_reconciliation_logs` |
+|---|---|---|---|
+| anon | 有効なもののみ（1/2 件） | 0 件 | 0 件 |
+| 本部オペレーター | 無効含む全件（2/2 件） | 0 件 | 0 件 |
+| 本部管理者 | 全件 | 全件 | 全件 |
+
+`verify_schema.sql` の 3 項目は `0006` 適用後も PASS。

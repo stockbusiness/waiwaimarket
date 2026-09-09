@@ -16,6 +16,8 @@
 
 • stores：店舗ページ
 
+• product_categories：商品カテゴリー。親子関係、表示順、公開状態
+
 • products：商品基本情報
 
 • product_variants：サイズ・色・SKU・価格
@@ -48,6 +50,8 @@
 
 • receipts：領収書・適格請求書の発行記録
 
+• stripe_webhook_events：Stripe Webhook の受信記録。イベントIDを主キーとし、同一イベントの二重処理を拒否する。書き込みはサーバーのみ
+
 ## 7 2 ポイント主要テーブル
 
 • point_accounts：マーケット購入者IDごとのポイント口座
@@ -69,5 +73,7 @@
 • point_issuance_budgets：基本還元の警告基準額、キャンペーン発行上限と実績
 
 • point_adjustment_requests：手動調整の申請・承認
+
+• point_reconciliation_logs：日次照合の実行結果と対応履歴。実行日、差分有無、差分内容、対応状況、対応者、対応日時を保存する。実行日ごとに1行とし、バッチの再実行で行が増えないようにする
 
 台帳には最低限、購入者ID、増減量、entry_type、理由、注文ID、注文明細ID、元ロットID、負担者、処理キー、実行者、発生日時、取消元IDを保存する。有効期限と残量はロットで管理する。
