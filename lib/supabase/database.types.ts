@@ -46,6 +46,90 @@ export type Database = {
         };
         Relationships: [];
       };
+      tenants: {
+        Row: {
+          id: string;
+          name: string;
+          status: TenantStatus;
+          stripe_account_id: string | null;
+          stripe_charges_enabled: boolean;
+          stripe_payouts_enabled: boolean;
+          fee_rate: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          status?: TenantStatus;
+        };
+        Update: {
+          name?: string;
+          status?: TenantStatus;
+          stripe_account_id?: string | null;
+          stripe_charges_enabled?: boolean;
+          stripe_payouts_enabled?: boolean;
+        };
+        Relationships: [];
+      };
+      tenant_legal_profiles: {
+        Row: {
+          tenant_id: string;
+          legal_name: string;
+          representative_name: string;
+          address: string;
+          phone: string;
+          email: string;
+          invoice_registration_number: string | null;
+          return_policy: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          tenant_id: string;
+          legal_name: string;
+          representative_name: string;
+          address: string;
+          phone: string;
+          email: string;
+          invoice_registration_number?: string | null;
+          return_policy?: string | null;
+        };
+        Update: {
+          legal_name?: string;
+          representative_name?: string;
+          address?: string;
+          phone?: string;
+          email?: string;
+          invoice_registration_number?: string | null;
+          return_policy?: string | null;
+        };
+        Relationships: [];
+      };
+      stripe_webhook_events: {
+        Row: {
+          event_id: string;
+          type: string;
+          payload: Json;
+          received_at: string;
+          processed_at: string | null;
+          process_error: string | null;
+          attempts: number;
+        };
+        Insert: {
+          event_id: string;
+          type: string;
+          payload: Json;
+          processed_at?: string | null;
+          process_error?: string | null;
+          attempts?: number;
+        };
+        Update: {
+          processed_at?: string | null;
+          process_error?: string | null;
+          attempts?: number;
+        };
+        Relationships: [];
+      };
       tenant_members: {
         Row: {
           id: string;

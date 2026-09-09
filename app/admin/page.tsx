@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { requireHqOperator } from "@/lib/auth/guard";
 import { withPageGuard } from "@/lib/auth/page-guard";
@@ -20,8 +22,11 @@ export default async function AdminHome() {
         <SignOutButton audience="hq" />
       </header>
 
+      <Link href="/admin/tenants" className="w-fit underline underline-offset-2">
+        テナント審査
+      </Link>
+
       <p className="text-sm leading-6">
-        テナント審査の画面は次の変更で追加します。
         {context.role === "hq_admin" &&
         context.assuranceLevel !== "aal2"
           ? "　多要素認証が未設定です。設定するまでルール変更・精算確定・手動調整は行えません。"
