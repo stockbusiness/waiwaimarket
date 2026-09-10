@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { recordAudit } from "@/lib/audit/log";
-import { authErrorResponse } from "@/lib/auth/errors";
+import { apiErrorResponse } from "@/lib/http/errors";
 import { requireTenantMember } from "@/lib/auth/guard";
 import { storeSchema } from "@/lib/validation/tenant";
 
@@ -59,9 +59,6 @@ export async function PUT(request: NextRequest) {
 
     return Response.json({ ok: true });
   } catch (error) {
-    const authResponse = authErrorResponse(error);
-    if (authResponse) return authResponse;
-    console.error("店舗情報の保存に失敗しました", error);
-    return Response.json({ error: { reason: "internal" } }, { status: 500 });
+    return apiErrorResponse(error, "店舗情報の保存に失敗しました");
   }
 }

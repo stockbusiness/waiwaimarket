@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { recordAudit } from "@/lib/audit/log";
-import { authErrorResponse } from "@/lib/auth/errors";
+import { apiErrorResponse } from "@/lib/http/errors";
 import { requireTenantOwner } from "@/lib/auth/guard";
 import { createConnectedAccount, createOnboardingLink } from "@/lib/payments/connect";
 import { siteUrl } from "@/lib/supabase/env";
@@ -69,9 +69,6 @@ export async function POST(request: NextRequest) {
 
     return Response.json({ url: link.url });
   } catch (error) {
-    const authResponse = authErrorResponse(error);
-    if (authResponse) return authResponse;
-    console.error("Stripe オンボーディングの開始に失敗しました", error);
-    return Response.json({ error: { reason: "internal" } }, { status: 500 });
+    return apiErrorResponse(error, "Stripe オンボーディングの開始に失敗しました");
   }
 }

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { readApiError } from "@/lib/http/error-message";
+
 export function StripeOnboardingButton({
   tenantId,
   hasAccount,
@@ -23,7 +25,7 @@ export function StripeOnboardingButton({
     });
 
     if (!response.ok) {
-      setError("Stripe の手続きを開始できませんでした");
+      setError(await readApiError(response, "Stripe の手続きを開始できませんでした"));
       setLoading(false);
       return;
     }

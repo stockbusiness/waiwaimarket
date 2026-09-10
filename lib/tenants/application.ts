@@ -16,7 +16,12 @@ import type { TenantApplicationInput } from "@/lib/validation/tenant";
 
 export type ApplicationResult =
   | { ok: true; tenantId: string }
-  | { ok: false; reason: "already_belongs_to_tenant" | "failed" };
+  | {
+      ok: false;
+      reason: "already_belongs_to_tenant" | "failed";
+      /** PostgreSQL のエラーコード。原因の切り分けに使う（例 42501 = RLS 違反） */
+      code?: string;
+    };
 
 export async function submitTenantApplication(params: {
   userId: string;
@@ -46,7 +51,7 @@ export async function submitTenantApplication(params: {
 
   if (tenantError || !tenant) {
     console.error("テナントの作成に失敗しました", tenantError);
-    return { ok: false, reason: "failed" };
+    return { ok: false, reason: "failed", code: tenantError?.code };
   }
 
   const { error: memberError } = await service
@@ -71,7 +76,11 @@ export async function submitTenantApplication(params: {
     // tenants への on delete cascade が張ってある。
     console.error("出店申請の登録に失敗しました", { memberError, legalError });
     await service.from("tenants").delete().eq("id", tenant.id);
-    return { ok: false, reason: "failed" };
+    return {
+      ok: false,
+      reason: "failed",
+      code: memberError?.code ?? legalError?.code,
+    };
   }
 
   await recordAudit({

@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { readApiError } from "@/lib/http/error-message";
+
 import type { TenantReviewAction } from "@/lib/tenants/status";
 
 const LABELS: Record<TenantReviewAction, string> = {
@@ -40,13 +42,14 @@ export function TenantReviewActions({
     });
 
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as
-        | { error?: { reason?: string; blockers?: string[]; message?: string } }
+      // 承認できない理由が返っていればそれを優先する
+      const cloned = response.clone();
+      const body = (await cloned.json().catch(() => null)) as
+        | { error?: { blockers?: string[] } }
         | null;
       setError(
         body?.error?.blockers?.join(" / ") ??
-          body?.error?.message ??
-          "操作できませんでした",
+          (await readApiError(response, "操作できませんでした")),
       );
       setPending(null);
       return;

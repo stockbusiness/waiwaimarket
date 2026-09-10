@@ -6,7 +6,12 @@ import {
   audienceForPath,
   isPublicAuthPath,
 } from "@/lib/supabase/audience";
-import { isProduction, supabaseAnonKey, supabaseUrl } from "@/lib/supabase/env";
+import {
+  ConfigurationError,
+  isProduction,
+  supabaseAnonKey,
+  supabaseUrl,
+} from "@/lib/supabase/env";
 
 /**
  * Next.js 16 では middleware.ts は proxy.ts へ名称変更された（機能は同じ）。
@@ -21,6 +26,23 @@ import { isProduction, supabaseAnonKey, supabaseUrl } from "@/lib/supabase/env";
  * lib/auth/guard.ts（API 側）と RLS（DB 側）の二重で行う。
  */
 export async function proxy(request: NextRequest) {
+  try {
+    return await handle(request);
+  } catch (error) {
+    // 環境変数が 1 つ欠けているだけで全ページが素の 500 になると、
+    // ログを見に行くまで原因が分からない。足りない変数名だけを返す（値は返さない）。
+    if (error instanceof ConfigurationError) {
+      console.error("proxy: 設定エラー", { variable: error.variableName });
+      return new NextResponse(
+        `サーバーの設定が未完了です。\n環境変数 ${error.variableName} が設定されていません。`,
+        { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } },
+      );
+    }
+    throw error;
+  }
+}
+
+async function handle(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const audience = audienceForPath(pathname);
   const config = AUDIENCE_CONFIG[audience];
