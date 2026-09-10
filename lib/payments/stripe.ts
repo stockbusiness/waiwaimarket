@@ -3,6 +3,7 @@ import "server-only";
 import Stripe from "stripe";
 
 import { required } from "@/lib/supabase/env";
+import { assertStripeSecretKey } from "./secret-key";
 
 /**
  * Stripe SDK の唯一の入口（CLAUDE.md 決済ルール）。
@@ -19,7 +20,15 @@ let cached: Stripe | null = null;
 export function stripe(): Stripe {
   if (cached) return cached;
 
-  cached = new Stripe(required("STRIPE_SECRET_KEY", process.env.STRIPE_SECRET_KEY), {
+  // required() が前後の空白・改行を落とし、ヘッダに使えない文字を弾く。
+  // 貼り付け時に紛れ込んだ改行で Authorization ヘッダの組み立てが落ち、
+  // Stripe の接続エラーに化けて原因が見えなくなったことがある。
+  const secretKey = assertStripeSecretKey(
+    "STRIPE_SECRET_KEY",
+    required("STRIPE_SECRET_KEY", process.env.STRIPE_SECRET_KEY),
+  );
+
+  cached = new Stripe(secretKey, {
     apiVersion: STRIPE_API_VERSION,
     appInfo: { name: "waiwaimarket" },
   });

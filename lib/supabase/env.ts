@@ -28,9 +28,49 @@ export class ConfigurationError extends Error {
   }
 }
 
+/**
+ * HTTP ヘッダに載せられない文字を含む位置（0 始まり）を返す。無ければ -1。
+ *
+ * Node は Authorization などのヘッダ値に印字可能 ASCII 以外が入ると
+ * `ERR_INVALID_CHAR` を投げる。これは送信前に落ちるため、SDK の層では
+ * 「接続エラー」に化けて原因が見えなくなる。実際に Stripe の
+ * `Invalid character in header content ["Authorization"]` で詰まった。
+ */
+function findUnsafeHeaderCharIndex(value: string): number {
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code < 0x20 || code > 0x7e) return i;
+  }
+  return -1;
+}
+
+/**
+ * 環境変数を必須として読み出す。すべての環境変数はここを通る。
+ *
+ * 前後の空白と改行は落とす。キーや URL の前後の空白に意味はなく、
+ * 管理画面へ貼り付けるときに紛れ込むほうがはるかに多い。
+ * 落としたあとに使えない文字が残っていれば設定エラーとして扱う。
+ *
+ * メッセージに値そのものを含めてはならない（ログに残る）。
+ */
 export function required(name: string, value: string | undefined): string {
   if (!value) throw new ConfigurationError(name);
-  return value;
+
+  const trimmed = value.trim();
+  if (!trimmed) throw new ConfigurationError(name);
+
+  const unsafeIndex = findUnsafeHeaderCharIndex(trimmed);
+  if (unsafeIndex >= 0) {
+    const code = trimmed.charCodeAt(unsafeIndex);
+    const kind = code < 0x20 || code === 0x7f ? "制御文字（改行など）" : "ASCII 以外の文字";
+    throw new ConfigurationError(
+      name,
+      `環境変数 ${name} の値に ${kind} が含まれています（${unsafeIndex + 1} 文字目）。` +
+        `値を貼り直して、改行や全角文字が混ざっていないか確認してください。`,
+    );
+  }
+
+  return trimmed;
 }
 
 export function supabaseUrl(): string {
@@ -45,7 +85,9 @@ export function supabaseAnonKey(): string {
 }
 
 export function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000")
+    .trim()
+    .replace(/\/$/, "");
 }
 
 export function isProduction(): boolean {

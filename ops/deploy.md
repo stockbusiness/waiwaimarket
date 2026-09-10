@@ -27,6 +27,22 @@
 絶対に付けないこと。`lib/supabase/service.ts` と `lib/payments/stripe.ts` は
 `server-only` を import しているため、誤ってクライアントから辿るとビルドが落ちる。
 
+### 貼り付け時の注意
+
+**値に改行を混ぜないこと。** Vercel の入力欄へコピーするとき、末尾の改行ごと拾ったり
+折り返しが改行として入ったりする。キーは HTTP の `Authorization` ヘッダに載るため、
+改行が 1 つ入るだけで Node が送信前に `ERR_INVALID_CHAR` で落ちる。SDK の層では
+「接続エラー」に化けるので、ログを見るまで原因が分からない
+（2026-09-10 に `STRIPE_SECRET_KEY` で実際に発生）。
+
+`lib/supabase/env.ts` の `required()` が前後の空白を落とし、途中に使えない文字が
+残っていれば設定エラーとして 503 と変数名を返す。値を貼り直したら **Redeploy が必要**。
+環境変数はデプロイに紐づくため、保存しただけでは既存のデプロイに反映されない。
+
+キーの取り違えも入口で弾く。`SUPABASE_SERVICE_ROLE_KEY` に Publishable キー
+（`sb_publishable_…`）、`STRIPE_SECRET_KEY` に公開可能キー（`pk_…`）を入れた場合は
+設定エラーになる。
+
 ---
 
 ## 1. Supabase プロジェクト
