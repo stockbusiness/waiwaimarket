@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { readApiError } from "@/lib/http/error-message";
+import { audienceApiPath } from "@/lib/supabase/audience";
 
 type Field = {
   name: string;
@@ -44,7 +45,7 @@ export function TenantApplicationForm() {
       FIELDS.map((field) => [field.name, String(form.get(field.name) ?? "")]),
     );
 
-    const response = await fetch("/api/tenant/application", {
+    const response = await fetch(audienceApiPath("tenant", "application"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { readApiError } from "@/lib/http/error-message";
+import { audienceApiPath } from "@/lib/supabase/audience";
 
 type Props = {
   tenantId: string;
@@ -28,7 +29,7 @@ export function StoreForm({ tenantId, initial }: Props) {
     setBusy(true);
 
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/tenant/store", {
+    const response = await fetch(audienceApiPath("tenant", "store"), {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({

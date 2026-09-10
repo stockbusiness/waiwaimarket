@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { readApiError } from "@/lib/http/error-message";
 
+import { audienceApiPath } from "@/lib/supabase/audience";
 import type { TenantReviewAction } from "@/lib/tenants/status";
 
 const LABELS: Record<TenantReviewAction, string> = {
@@ -35,7 +36,7 @@ export function TenantReviewActions({
         ? (window.prompt("理由を入力してください（監査ログに残ります）") ?? "")
         : undefined;
 
-    const response = await fetch(`/api/admin/tenants/${tenantId}/review`, {
+    const response = await fetch(audienceApiPath("hq", `tenants/${tenantId}/review`), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ action, reason: reason || undefined }),

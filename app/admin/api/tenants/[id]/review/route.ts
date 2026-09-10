@@ -13,7 +13,7 @@ import { tenantReviewSchema } from "@/lib/validation/tenant";
  */
 export async function POST(
   request: NextRequest,
-  context: RouteContext<"/api/admin/tenants/[id]/review">,
+  context: RouteContext<"/admin/api/tenants/[id]/review">,
 ) {
   try {
     const parsed = tenantReviewSchema.safeParse(await request.json());

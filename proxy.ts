@@ -4,6 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 import {
   AUDIENCE_CONFIG,
   audienceForPath,
+  isApiPath,
   isPublicAuthPath,
 } from "@/lib/supabase/audience";
 import {
@@ -79,7 +80,10 @@ async function handle(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const needsLogin = audience !== "buyer" && !isPublicAuthPath(pathname);
+  // API はリダイレクトせずハンドラへ通す。fetch に HTML のログイン画面を
+  // 返しても扱えないため、ハンドラが 401 を JSON で返すほうが正しい。
+  const needsLogin =
+    audience !== "buyer" && !isPublicAuthPath(pathname) && !isApiPath(pathname);
 
   if (needsLogin && !user) {
     const loginUrl = new URL(config.loginPath, request.url);

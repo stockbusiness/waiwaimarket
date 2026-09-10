@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { readApiError } from "@/lib/http/error-message";
+import { audienceApiPath } from "@/lib/supabase/audience";
 
 type Field = { name: string; label: string; required?: boolean; type?: string; hint?: string; multiline?: boolean };
 
@@ -43,7 +44,7 @@ export function LegalProfileForm({
     const payload: Record<string, string> = { tenantId };
     for (const field of FIELDS) payload[field.name] = String(form.get(field.name) ?? "");
 
-    const response = await fetch("/api/tenant/legal-profile", {
+    const response = await fetch(audienceApiPath("tenant", "legal-profile"), {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),

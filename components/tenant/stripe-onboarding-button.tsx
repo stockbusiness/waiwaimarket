@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { readApiError } from "@/lib/http/error-message";
+import { audienceApiPath } from "@/lib/supabase/audience";
 
 export function StripeOnboardingButton({
   tenantId,
@@ -18,7 +19,7 @@ export function StripeOnboardingButton({
     setError(null);
     setLoading(true);
 
-    const response = await fetch("/api/tenant/onboarding/stripe", {
+    const response = await fetch(audienceApiPath("tenant", "onboarding/stripe"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ tenantId }),
