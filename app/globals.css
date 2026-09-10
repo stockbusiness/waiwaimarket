@@ -1,26 +1,105 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * 色は意味で名前を付け、明暗の切り替えはこのファイルの中だけで行う。
+ * 各画面に dark: を書き足す方式にすると、画面が増えるたびに 2 通りの
+ * 指定を維持することになり、必ず片方が取り残される。
+ *
+ * 雛形（create-next-app）が置いていた body への直接指定は外した。
+ * レイヤー外の宣言はレイヤー内のユーティリティに勝つため、
+ * layout.tsx の bg-white / text-zinc-900 を上書きしてしまい、
+ * 端末がダークモードだと「黒背景に明るいテキスト」になる一方で
+ * 各画面のクラスはライト前提のまま（枠線が白く浮き、補足文字が沈む）
+ * という食い違いが起きていた。色は必ずユーティリティ経由で当てる。
+ */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  /* 面 */
+  --surface: #ffffff;
+  --raised: #ffffff;
+
+  /* 文字 */
+  --body: #18181b;
+  --muted: #52525b;
+  --subtle: #71717a;
+
+  /* 罫線 */
+  --line: #e4e4e7;
+  --line-strong: #d4d4d8;
+
+  /* 主要操作 */
+  --accent: #18181b;
+  --on-accent: #ffffff;
+
+  /* 状態 */
+  --danger: #b91c1c;
+  --danger-surface: #fef2f2;
+  --success: #15803d;
+  --warning: #78350f;
+  --warning-surface: #fffbeb;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --surface: #0b0b0c;
+    --raised: #18181b;
+
+    --body: #f4f4f5;
+    --muted: #a1a1aa;
+    --subtle: #8f8f99;
+
+    --line: #3f3f46;
+    --line-strong: #52525b;
+
+    --accent: #f4f4f5;
+    --on-accent: #18181b;
+
+    --danger: #fca5a5;
+    --danger-surface: #2a1416;
+    --success: #86efac;
+    --warning: #fcd34d;
+    --warning-surface: #2a2010;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/*
+ * inline を付けると、生成されるユーティリティが値を焼き込まず var() を
+ * 参照する。これがないと上のメディアクエリで色が切り替わらない。
+ */
+@theme inline {
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-body: var(--body);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-danger-surface: var(--danger-surface);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-warning-surface: var(--warning-surface);
+
+  /* 日本語を含むため、和文フォントまで指定する */
+  --font-sans: system-ui, -apple-system, "Hiragino Kaku Gothic ProN",
+    "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+}
+
+@layer base {
+  /*
+   * キーボード操作時に、いまどこにいるかが分かるようにする。
+   * 既定の輪郭は背景色によっては見えなくなるため、面の色と対比する
+   * 二重の輪郭にしている。
+   */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* 端末の設定に合わせてフォームの既定の見た目も切り替える */
+  :root {
+    color-scheme: light dark;
+  }
 }

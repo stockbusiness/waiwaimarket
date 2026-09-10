@@ -10,7 +10,7 @@ export function SignOutButton({ audience }: { audience: Audience }) {
 
   return (
     <form action={action} method="post">
-      <button type="submit" className="text-sm underline underline-offset-2">
+      <button type="submit" className="rounded-sm text-sm text-muted underline underline-offset-4 hover:text-body">
         ログアウト
       </button>
     </form>

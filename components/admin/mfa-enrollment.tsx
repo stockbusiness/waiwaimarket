@@ -2,6 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Field, TextInput } from "@/components/ui/field";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -111,7 +114,9 @@ export function MfaEnrollment({ alreadyVerified }: { alreadyVerified: boolean })
               alt="認証アプリ登録用の QR コード"
               width={180}
               height={180}
-              className="rounded border border-zinc-200 bg-white p-2"
+              /* QR は黒い図形のみで背景が透明なため、暗い面の上では読み取れない。
+                 ここだけはテーマに関わらず白地を敷く。 */
+              className="rounded border border-line bg-white p-2"
             />
             <details className="text-sm">
               <summary className="cursor-pointer">QR コードを読み取れない場合</summary>
@@ -119,7 +124,7 @@ export function MfaEnrollment({ alreadyVerified }: { alreadyVerified: boolean })
             </details>
           </div>
         ) : (
-          <p className="text-sm text-zinc-600">登録の準備をしています…</p>
+          <p className="text-sm text-muted">登録の準備をしています…</p>
         )
       ) : (
         <p className="text-sm leading-6">
@@ -128,32 +133,27 @@ export function MfaEnrollment({ alreadyVerified }: { alreadyVerified: boolean })
       )}
 
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          確認コード
-          <input
+        <Field label="確認コード" required>
+          <TextInput
             value={code}
             onChange={(event) => setCode(event.target.value)}
             inputMode="numeric"
             autoComplete="one-time-code"
             maxLength={10}
             required
-            className="w-40 rounded border border-zinc-300 px-3 py-2 font-mono text-base"
+            className="w-40 font-mono"
           />
-        </label>
+        </Field>
 
-        {error ? (
-          <p role="alert" className="text-sm text-red-700">
-            {error}
-          </p>
-        ) : null}
+        {error ? <Alert tone="error">{error}</Alert> : null}
 
-        <button
+        <Button
           type="submit"
           disabled={busy || (mode === "enroll" && !enrollment)}
-          className="w-fit rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="w-fit"
         >
           {busy ? "確認中…" : "確認する"}
-        </button>
+        </Button>
       </form>
     </div>
   );

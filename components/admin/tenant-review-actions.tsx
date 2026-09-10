@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { readApiError } from "@/lib/http/error-message";
 
 import { audienceApiPath } from "@/lib/supabase/audience";
@@ -64,22 +66,18 @@ export function TenantReviewActions({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
         {actions.map((action) => (
-          <button
+          <Button
             key={action}
             type="button"
+            variant={action === "approve" ? "primary" : "secondary"}
             onClick={() => run(action)}
             disabled={pending !== null}
-            className="rounded border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-50"
           >
-            {LABELS[action]}
-          </button>
+            {pending === action ? "実行中…" : LABELS[action]}
+          </Button>
         ))}
       </div>
-      {error ? (
-        <p role="alert" className="text-sm text-red-700">
-          {error}
-        </p>
-      ) : null}
+      {error ? <Alert tone="error">{error}</Alert> : null}
     </div>
   );
 }

@@ -1,7 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { StripeOnboardingButton } from "@/components/tenant/stripe-onboarding-button";
+import { Alert } from "@/components/ui/alert";
+import { TextLink } from "@/components/ui/button";
+import { Card, PageHeader, PageShell } from "@/components/ui/page";
 import { requireTenantUser } from "@/lib/auth/guard";
 import { withPageGuard } from "@/lib/auth/page-guard";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -57,33 +59,32 @@ export default async function TenantOnboardingPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-6 py-12">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Stripe の手続き</h1>
-        <p className="text-sm text-zinc-600">{tenant.name}</p>
-      </header>
+    <PageShell width="form">
+      <PageHeader title="Stripe の手続き" description={tenant.name} />
 
-      <dl className="flex flex-col gap-2 text-sm">
-        <div className="flex gap-3">
-          <dt className="w-32 text-zinc-600">決済の受付</dt>
-          <dd>{chargesEnabled ? "有効" : "未完了"}</dd>
-        </div>
-        <div className="flex gap-3">
-          <dt className="w-32 text-zinc-600">出金</dt>
-          <dd>{payoutsEnabled ? "有効" : "未完了"}</dd>
-        </div>
-        {currentlyDue.length > 0 ? (
-          <div className="flex gap-3">
-            <dt className="w-32 text-zinc-600">未提出の項目</dt>
-            <dd>{currentlyDue.length} 件</dd>
+      <Card>
+        <dl className="flex flex-col gap-2 text-sm">
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted">決済の受付</dt>
+            <dd className="font-medium">{chargesEnabled ? "有効" : "未完了"}</dd>
           </div>
-        ) : null}
-      </dl>
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted">出金</dt>
+            <dd className="font-medium">{payoutsEnabled ? "有効" : "未完了"}</dd>
+          </div>
+          {currentlyDue.length > 0 ? (
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted">未提出の項目</dt>
+              <dd className="font-medium">{currentlyDue.length} 件</dd>
+            </div>
+          ) : null}
+        </dl>
+      </Card>
 
       {chargesEnabled && payoutsEnabled ? (
-        <p className="text-sm leading-6">
+        <Alert tone="success">
           Stripe の手続きは完了しています。本部の審査結果をお待ちください。
-        </p>
+        </Alert>
       ) : (
         <StripeOnboardingButton
           tenantId={tenant.id}
@@ -91,9 +92,9 @@ export default async function TenantOnboardingPage() {
         />
       )}
 
-      <Link href="/tenant" className="text-sm underline underline-offset-2">
-        テナント管理へ戻る
-      </Link>
-    </main>
+      <p className="text-sm">
+        <TextLink href="/tenant">テナント管理へ戻る</TextLink>
+      </p>
+    </PageShell>
   );
 }

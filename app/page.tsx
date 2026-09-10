@@ -1,27 +1,31 @@
-import Link from "next/link";
+import { TextLink } from "@/components/ui/button";
+import { PageHeader, PageShell } from "@/components/ui/page";
+
+const ENTRANCES = [
+  { href: "/login", label: "購入者ログイン", note: "商品の購入とポイントの確認" },
+  { href: "/tenant/login", label: "テナントログイン", note: "出店申請と店舗の管理" },
+  { href: "/admin/login", label: "本部ログイン", note: "審査と運営" },
+];
 
 export default function Home() {
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-16">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">一般物販マーケット</h1>
-        <p className="text-sm text-zinc-600">
-          フェーズ1（共通基盤とテナント管理）を実装中です。
-          商品一覧と購入導線はフェーズ2以降で追加します。
-        </p>
-      </header>
+    <PageShell>
+      <PageHeader
+        title="一般物販マーケット"
+        description="フェーズ1（共通基盤とテナント管理）を実装中です。商品一覧と購入導線はフェーズ2以降で追加します。"
+      />
 
-      <nav className="flex flex-col gap-3 text-sm">
-        <Link href="/login" className="underline underline-offset-2">
-          購入者ログイン
-        </Link>
-        <Link href="/tenant/login" className="underline underline-offset-2">
-          テナントログイン
-        </Link>
-        <Link href="/admin/login" className="underline underline-offset-2">
-          本部ログイン
-        </Link>
+      <nav aria-label="ログイン" className="flex flex-col gap-3">
+        {ENTRANCES.map((entrance) => (
+          <div
+            key={entrance.href}
+            className="flex flex-col gap-0.5 rounded-lg border border-line bg-raised p-4 text-sm"
+          >
+            <TextLink href={entrance.href}>{entrance.label}</TextLink>
+            <span className="text-muted">{entrance.note}</span>
+          </div>
+        ))}
       </nav>
-    </main>
+    </PageShell>
   );
 }

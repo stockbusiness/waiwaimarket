@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Field, TextInput } from "@/components/ui/field";
 import { AUDIENCE_CONFIG, type Audience } from "@/lib/supabase/audience";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { siteUrl } from "@/lib/supabase/env";
@@ -45,40 +48,30 @@ export function LoginForm({ audience, next }: Props) {
 
   if (state === "sent") {
     return (
-      <p className="text-sm leading-6">
+      <Alert tone="success">
         <strong>{email}</strong> 宛に確認メールを送りました。
         メール内のリンクを開くとログインが完了します。
-      </p>
+      </Alert>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <label className="flex flex-col gap-1 text-sm">
-        メールアドレス
-        <input
+      <Field label="メールアドレス" required>
+        <TextInput
           type="email"
           required
           autoComplete="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          className="rounded border border-zinc-300 px-3 py-2 text-base"
         />
-      </label>
+      </Field>
 
-      {error ? (
-        <p role="alert" className="text-sm text-red-700">
-          {error}
-        </p>
-      ) : null}
+      {error ? <Alert tone="error">{error}</Alert> : null}
 
-      <button
-        type="submit"
-        disabled={state === "sending"}
-        className="rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
+      <Button type="submit" disabled={state === "sending"}>
         {state === "sending" ? "送信中…" : "確認メールを送る"}
-      </button>
+      </Button>
     </form>
   );
 }

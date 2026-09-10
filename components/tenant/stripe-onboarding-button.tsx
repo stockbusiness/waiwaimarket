@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { readApiError } from "@/lib/http/error-message";
 import { audienceApiPath } from "@/lib/supabase/audience";
 
@@ -37,23 +39,14 @@ export function StripeOnboardingButton({
 
   return (
     <div className="flex flex-col gap-2">
-      <button
-        type="button"
-        onClick={start}
-        disabled={loading}
-        className="w-fit rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
+      <Button type="button" onClick={start} disabled={loading} className="w-fit">
         {loading
           ? "接続中…"
           : hasAccount
             ? "Stripe の手続きを再開する"
             : "Stripe の手続きを始める"}
-      </button>
-      {error ? (
-        <p role="alert" className="text-sm text-red-700">
-          {error}
-        </p>
-      ) : null}
+      </Button>
+      {error ? <Alert tone="error">{error}</Alert> : null}
     </div>
   );
 }
