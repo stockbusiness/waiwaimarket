@@ -72,3 +72,33 @@ export function isPublicAuthPath(pathname: string): boolean {
   }
   return pathname.startsWith("/auth/");
 }
+
+/**
+ * cookie の path 判定（RFC 6265 5.1.4）。
+ * その面の認証 cookie がこの経路へ送られるかを返す。
+ */
+export function cookieReachesPath(audience: Audience, requestPath: string): boolean {
+  const cookiePath = AUDIENCE_CONFIG[audience].cookiePath;
+  if (cookiePath === requestPath) return true;
+  if (!requestPath.startsWith(cookiePath)) return false;
+  if (cookiePath.endsWith("/")) return true;
+  return requestPath[cookiePath.length] === "/";
+}
+
+/**
+ * その面の API の経路を組み立てる。
+ *
+ * cookie の path を面ごとに分けているため、API も同じ path 配下に置く必要がある。
+ * /api/tenant/... のような共通の経路に置くと、ブラウザが認証 cookie を送らず、
+ * 画面は開けるのに API だけが常に未認証になる（実際にそれで詰まった）。
+ * 経路をここで組み立てることで、置き場所と cookie scope がずれないようにする。
+ */
+export function audienceApiPath(audience: Audience, subPath: string): string {
+  const base = AUDIENCE_CONFIG[audience].cookiePath === "/" ? "" : AUDIENCE_CONFIG[audience].cookiePath;
+  return `${base}/api/${subPath.replace(/^\//, "")}`;
+}
+
+/** API の経路かどうか。proxy はここをログイン画面へリダイレクトしない */
+export function isApiPath(pathname: string): boolean {
+  return pathname.startsWith("/api/") || pathname.includes("/api/");
+}

@@ -61,7 +61,7 @@ const checks = [
   {
     name: "出店申請 API が未認証を 401 で弾く",
     run: async () => {
-      const res = await fetch(`${baseUrl}/api/tenant/application`, {
+      const res = await fetch(`${baseUrl}/tenant/api/application`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({}),
@@ -74,7 +74,7 @@ const checks = [
     name: "テナント審査 API が未認証を 401 で弾く",
     run: async () => {
       const res = await fetch(
-        `${baseUrl}/api/admin/tenants/00000000-0000-4000-8000-000000000000/review`,
+        `${baseUrl}/admin/api/tenants/00000000-0000-4000-8000-000000000000/review`,
         {
           method: "POST",
           headers: { "content-type": "application/json" },
