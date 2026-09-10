@@ -77,3 +77,61 @@ docs に書かれていない判断が必要になったら、実装せずに質
 ## 実装済み
 
 （各フェーズ完了時に、判明した制約と設計判断をここへ追記する）
+
+### フェーズ1（実装中）で判明した制約
+
+同じ罠を二度踏まないための記録。いずれも実際に本番または検証で詰まった。
+
+**API は cookie の path 配下に置く。**
+面ごとにセッション cookie の path を `/`・`/tenant`・`/admin` に分けている。
+RFC 6265 5.1.4 の path マッチにより、path が `/tenant` の cookie は
+`/api/tenant/application` には送られない。テナント API は `/tenant/api/...`、
+本部 API は `/admin/api/...` に置くこと（docs/04 9.0）。
+破っても「未認証を 401 で弾く正しい挙動」に見えるため気づけない。
+実際にテナント・本部の API が一度も認証されていなかった。
+判定は `lib/supabase/audience.ts` の `cookieReachesPath()` にあり、
+`tests/auth/api-path-scope.test.ts` で固定してある。
+
+**RLS ポリシーの `using` 式は呼び出し元の権限で評価される。**
+ポリシー内で他テーブルを `exists (select ... from tenants ...)` で引くと、
+その `tenants` にも RLS がかかる。匿名から見ると常に偽になり、
+公開すべき情報が誰にも見えなくなる（特商法表記で発生）。
+他テーブルを参照する判定は `security definer` の補助関数に切り出す
+（`is_active_tenant()` など）。
+
+**`security definer` 関数の中では `current_user` が所有者に変わる。**
+`current_user` でサービスロールかどうかを判定するガードを definer で
+書くと、常に真になってガードが素通りする。商品の承認カラムを守る
+`products_guard_review_columns()` は invoker のままにしてある。
+
+**環境変数の値に改行や非 ASCII を混ぜない。**
+キーは HTTP の `Authorization` ヘッダに載るため、改行が 1 つ入るだけで
+Node が送信前に `ERR_INVALID_CHAR` で落ちる。SDK の層では「接続エラー」に
+化けるので原因が見えない。`lib/supabase/env.ts` の `required()` が前後の
+空白を落とし、途中に使えない文字が残れば `ConfigurationError` にする。
+キーの取り違え（`SUPABASE_SERVICE_ROLE_KEY` に `sb_publishable_`、
+`STRIPE_SECRET_KEY` に `pk_`）も同じ場所で弾く。
+
+**`server-only` を付けたファイルは vitest から import できない。**
+検証ロジックは環境変数を読まない純粋な関数として別ファイルに切り出し、
+`server-only` を付けない（`lib/audit/entry.ts`、`lib/http/errors.ts`、
+`lib/supabase/service-key.ts`、`lib/payments/secret-key.ts`）。
+IO を伴う側にだけ `server-only` を付ける。
+
+**Next.js 16 の変更点。**
+`middleware.ts` は非推奨で `proxy.ts` を使う。`cookies()` は async。
+Route Handler の `params` は Promise。`LayoutProps` / `PageProps` は
+`next typegen` が生成する global なので、`typecheck` は
+`next typegen && tsc --noEmit` にしてある。route segment config の
+`preferredRegion` は非推奨で、リージョン指定は `vercel.json` で行う。
+
+**Supabase の SQL Editor は psql のメタコマンドを解釈しない。**
+`\set` や `\echo` を含む `verify_schema.sql` は貼れない。
+SQL Editor 用に単一の SELECT にまとめた
+`verify_schema_sql_editor.sql` を使う。
+
+**エラー応答は原因を区別できる形にする。**
+設定不足を 500 や「入力内容をご確認ください」で返すと、ログを見るまで
+原因が分からない。`lib/http/errors.ts` の `apiErrorResponse()` が
+認可の失敗を 401/403、設定不足を 503 と変数名、それ以外を 500 に分け、
+どの経路でも必ずログを残す。
