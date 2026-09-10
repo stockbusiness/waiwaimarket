@@ -15,8 +15,14 @@
 export class ConfigurationError extends Error {
   readonly variableName: string;
 
-  constructor(variableName: string) {
-    super(`環境変数 ${variableName} が未設定です。.env.example を参照して設定してください。`);
+  /**
+   * @param detail 未設定以外の理由。値そのものは絶対に渡さない（ログに残る）。
+   */
+  constructor(variableName: string, detail?: string) {
+    super(
+      detail ??
+        `環境変数 ${variableName} が未設定です。.env.example を参照して設定してください。`,
+    );
     this.name = "ConfigurationError";
     this.variableName = variableName;
   }

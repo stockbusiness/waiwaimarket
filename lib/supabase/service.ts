@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "./database.types";
 import { required, supabaseUrl } from "./env";
+import { assertServiceRoleKey } from "./service-key";
 
 /**
  * service_role クライアント。RLS を迂回するため、使い所を限定する（docs/00 8.2）。
@@ -20,9 +21,11 @@ import { required, supabaseUrl } from "./env";
  * 通常の読み書きは createSupabaseServerClient を使うこと。
  */
 export function createSupabaseServiceClient(): SupabaseClient<Database> {
-  const serviceRoleKey = required(
+  // 形式を検証してから使う。Publishable キーを取り違えて設定すると Supabase 側では
+  // 認証が通ってしまい、RLS を迂回したい INSERT だけが 42501 で落ちる。
+  const serviceRoleKey = assertServiceRoleKey(
     "SUPABASE_SERVICE_ROLE_KEY",
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    required("SUPABASE_SERVICE_ROLE_KEY", process.env.SUPABASE_SERVICE_ROLE_KEY),
   );
 
   return createClient<Database>(supabaseUrl(), serviceRoleKey, {
