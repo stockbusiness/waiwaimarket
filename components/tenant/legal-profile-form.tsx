@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { readApiError } from "@/lib/http/error-message";
+
 type Field = { name: string; label: string; required?: boolean; type?: string; hint?: string; multiline?: boolean };
 
 const FIELDS: Field[] = [
@@ -49,7 +51,7 @@ export function LegalProfileForm({
 
     setBusy(false);
     if (!response.ok) {
-      setError("保存できませんでした。入力内容をご確認ください。");
+      setError(await readApiError(response, "保存できませんでした"));
       return;
     }
     setSaved(true);

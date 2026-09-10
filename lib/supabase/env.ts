@@ -5,12 +5,25 @@
  * サービスロールキーの読み出しは lib/supabase/service.ts に閉じている。
  */
 
-export function required(name: string, value: string | undefined): string {
-  if (!value) {
-    throw new Error(
-      `環境変数 ${name} が未設定です。.env.example を参照して設定してください。`,
-    );
+/**
+ * 設定不足を表す例外。通常のエラーと区別できるようにする。
+ *
+ * これを個別に扱えないと、環境変数が 1 つ欠けているだけで
+ * 「Internal Server Error」や「入力内容をご確認ください」になり、
+ * ログを見に行くまで原因が分からない。実際にそれで詰まった。
+ */
+export class ConfigurationError extends Error {
+  readonly variableName: string;
+
+  constructor(variableName: string) {
+    super(`環境変数 ${variableName} が未設定です。.env.example を参照して設定してください。`);
+    this.name = "ConfigurationError";
+    this.variableName = variableName;
   }
+}
+
+export function required(name: string, value: string | undefined): string {
+  if (!value) throw new ConfigurationError(name);
   return value;
 }
 

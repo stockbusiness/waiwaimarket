@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { readApiError } from "@/lib/http/error-message";
+
 type Field = {
   name: string;
   label: string;
@@ -49,14 +51,7 @@ export function TenantApplicationForm() {
     });
 
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as
-        | { error?: { reason?: string } }
-        | null;
-      setError(
-        body?.error?.reason === "already_belongs_to_tenant"
-          ? "すでに別のテナントに所属しています"
-          : "申請を登録できませんでした。入力内容をご確認ください。",
-      );
+      setError(await readApiError(response, "申請を登録できませんでした"));
       setSubmitting(false);
       return;
     }

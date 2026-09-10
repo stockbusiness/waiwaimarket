@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { readApiError } from "@/lib/http/error-message";
+
 type Props = {
   tenantId: string;
   initial: {
@@ -41,14 +43,7 @@ export function StoreForm({ tenantId, initial }: Props) {
     setBusy(false);
 
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as
-        | { error?: { reason?: string } }
-        | null;
-      setError(
-        body?.error?.reason === "slug_taken"
-          ? "その店舗 URL はすでに使われています"
-          : "保存できませんでした。入力内容をご確認ください。",
-      );
+      setError(await readApiError(response, "保存できませんでした"));
       return;
     }
 

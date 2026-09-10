@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { authErrorResponse } from "@/lib/auth/errors";
+import { apiErrorResponse } from "@/lib/http/errors";
 import { requireHqAdmin, requireHqOperator } from "@/lib/auth/guard";
 import { reviewTenant } from "@/lib/tenants/review";
 import { requiresHqAdmin } from "@/lib/tenants/status";
@@ -50,9 +50,6 @@ export async function POST(
 
     return Response.json({ status: result.status });
   } catch (error) {
-    const authResponse = authErrorResponse(error);
-    if (authResponse) return authResponse;
-    console.error("テナント審査に失敗しました", error);
-    return Response.json({ error: { reason: "internal" } }, { status: 500 });
+    return apiErrorResponse(error, "テナント審査に失敗しました");
   }
 }
