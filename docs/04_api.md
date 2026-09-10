@@ -4,9 +4,34 @@
 
 # 9 API案
 
-名称は実装時に決定するAPI命名規約へ合わせて調整する。
+## 9.0 パス命名規約
 
-## 公開 購入者API
+面（購入者・テナント・本部）は別ログイン・別セッションとする（docs/00 5.4）。
+セッション cookie は面ごとに分け、path をそれぞれ `/`・`/tenant`・`/admin` に絞る。
+
+**この cookie の path 配下に API を置くこと。**
+
+| 面 | cookie の path | API のパス |
+|---|---|---|
+| 購入者 | `/` | `/api/...` |
+| テナント | `/tenant` | `/tenant/api/...` |
+| 本部 | `/admin` | `/admin/api/...` |
+
+理由は RFC 6265 5.1.4 の path マッチである。cookie の path が `/tenant` のとき、
+リクエストパス `/api/tenant/application` には cookie が**送られない**。
+`/tenant` で始まらないためである。購入者面だけは path が `/` なので
+`/api/...` のままでよい。
+
+これを守らないと、API は cookie を受け取れないまま常に未認証として扱われる。
+一見すると「未認証を 401 で弾いている」正しい挙動に見えるため、
+テナント・本部の API が一度も認証されていないことに気づけない。実際に起きた。
+
+cookie を使わない経路はこの規約の対象外とする。
+
+- Stripe Webhook（署名検証で認証する）
+- 内部API（サービス間認証を使う）
+
+## 9.1 公開 購入者API
 
 • GET /api/market/products
 
@@ -28,29 +53,57 @@
 
 • POST /api/market/orders/{id}/return-request
 
-## テナントAPI
+## 9.2 テナントAPI
 
-• POST /api/tenant/application
+• POST /tenant/api/application
 
-• POST /api/tenant/onboarding/stripe（連結アカウント作成・オンボーディングリンク発行）
+• POST /tenant/api/onboarding/stripe（連結アカウント作成・オンボーディングリンク発行）
 
-• POST /api/tenant/products
+• PUT /tenant/api/store（店舗情報。1テナント1件なので upsert）
 
-• PATCH /api/tenant/products/{id}
+• PUT /tenant/api/legal-profile（特定商取引法に基づく表記。同上）
 
-• POST /api/tenant/products/{id}/submit
+• POST /tenant/api/products
 
-• GET /api/tenant/orders
+• PATCH /tenant/api/products/{id}
 
-• POST /api/tenant/orders/{id}/ship
+• POST /tenant/api/products/{id}/submit
 
-• POST /api/tenant/orders/{id}/cancel（テナント都合）
+• GET /tenant/api/orders
 
-• POST /api/tenant/returns/{id}/decision
+• POST /tenant/api/orders/{id}/ship
 
-• GET /api/tenant/settlements
+• POST /tenant/api/orders/{id}/cancel（テナント都合）
 
-## ポイントAPI
+• POST /tenant/api/returns/{id}/decision
+
+• GET /tenant/api/settlements
+
+## 9.3 本部API
+
+• POST /admin/api/tenants/{id}/review
+
+  `action` で状態遷移を指定する。
+
+  | action | 遷移 | 権限 |
+  |---|---|---|
+  | `start_review` | applied / rejected → under_review | 本部オペレーター以上 |
+  | `approve` | under_review → approved | 本部オペレーター以上 |
+  | `reject` | under_review → rejected | 本部オペレーター以上 |
+  | `suspend` | approved → suspended | 本部管理者のみ |
+  | `reinstate` | suspended → approved | 本部管理者のみ |
+
+  停止と復帰を本部管理者に限るのは docs/00 5.4 の権限表による
+  （オペレーターはルール変更・精算確定・手動調整が不可）。
+
+本部の機能範囲は docs/00 5.3 に定める。商品審査、カテゴリー管理、手数料率設定、
+ポイント設定、手動付与・取消などの API は、各フェーズで実装する際にここへ追記する。
+
+本部管理者には多要素認証を必須とする（docs/00 8.2）。
+
+## 9.4 ポイントAPI
+
+購入者面から呼ぶため `/api/...` に置く。
 
 • GET /api/points/balance
 
@@ -72,7 +125,7 @@
 
 • POST /api/internal/points/expire（バッチ）
 
-## 決済 内部API
+## 9.5 決済 内部API
 
 • POST /api/webhooks/stripe
 
