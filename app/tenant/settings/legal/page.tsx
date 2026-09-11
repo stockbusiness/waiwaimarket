@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { LegalProfileForm } from "@/components/tenant/legal-profile-form";
-import { TextLink } from "@/components/ui/button";
-import { PageHeader, PageShell } from "@/components/ui/page";
+import { Breadcrumb, PageHeader, PageShell } from "@/components/ui/page";
 import { requireTenantUser } from "@/lib/auth/guard";
 import { withPageGuard } from "@/lib/auth/page-guard";
 
@@ -25,6 +24,12 @@ export default async function TenantLegalPage() {
 
   return (
     <PageShell width="form">
+      <Breadcrumb
+        items={[
+          { href: "/tenant", label: "テナント管理" },
+          { href: "/tenant/settings/legal", label: "事業者情報" },
+        ]}
+      />
       <PageHeader
         title="事業者情報"
         description="特定商取引法に基づく表記として、承認後は店舗ページに掲示されます。編集できるのはテナント管理者のみです。"
@@ -43,9 +48,6 @@ export default async function TenantLegalPage() {
         }}
       />
 
-      <p className="text-sm">
-        <TextLink href="/tenant">テナント管理へ戻る</TextLink>
-      </p>
     </PageShell>
   );
 }

@@ -27,9 +27,15 @@
   --line: #e4e4e7;
   --line-strong: #d4d4d8;
 
-  /* 主要操作 */
-  --accent: #18181b;
+  /* 主要操作。CTA・リンク・強調に使う 1 色（参考にしたマーケットの青を採寸） */
+  --accent: #067bbf;
   --on-accent: #ffffff;
+  --link: #067bbf;
+
+  /* フッター。明暗どちらでも黒地に白文字 */
+  --footer: #000000;
+  --on-footer: #ffffff;
+  --on-footer-muted: #a1a1aa;
 
   /* 状態 */
   --danger: #b91c1c;
@@ -51,8 +57,10 @@
     --line: #3f3f46;
     --line-strong: #52525b;
 
-    --accent: #f4f4f5;
-    --on-accent: #18181b;
+    /* 暗い面では同じ青が沈むので明度を上げる。白文字ではなく黒文字を載せる */
+    --accent: #4aa8e8;
+    --on-accent: #0b0b0c;
+    --link: #7cc4f2;
 
     --danger: #fca5a5;
     --danger-surface: #2a1416;
@@ -76,6 +84,10 @@
   --color-line-strong: var(--line-strong);
   --color-accent: var(--accent);
   --color-on-accent: var(--on-accent);
+  --color-link: var(--link);
+  --color-footer: var(--footer);
+  --color-on-footer: var(--on-footer);
+  --color-on-footer-muted: var(--on-footer-muted);
   --color-danger: var(--danger);
   --color-danger-surface: var(--danger-surface);
   --color-success: var(--success);

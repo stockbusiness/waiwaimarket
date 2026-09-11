@@ -1,4 +1,3 @@
-import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Badge } from "@/components/ui/alert";
 import { ButtonLink, TextLink } from "@/components/ui/button";
 import { Card, PageHeader, PageShell } from "@/components/ui/page";
@@ -25,8 +24,7 @@ export default async function TenantHome() {
         <PageHeader
           title="テナント管理"
           description="まだ出店申請が行われていません。"
-          actions={<SignOutButton audience="tenant" />}
-        />
+          />
         <div>
           <ButtonLink href="/tenant/apply">出店を申請する</ButtonLink>
         </div>
@@ -45,7 +43,6 @@ export default async function TenantHome() {
       <PageHeader
         title="テナント管理"
         description={context.user.email}
-        actions={<SignOutButton audience="tenant" />}
       />
 
       <ul className="flex flex-col gap-4">

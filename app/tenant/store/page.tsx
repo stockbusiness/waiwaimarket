@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { StoreForm } from "@/components/tenant/store-form";
 import { TextLink } from "@/components/ui/button";
-import { PageHeader, PageShell } from "@/components/ui/page";
+import { Breadcrumb, PageHeader, PageShell } from "@/components/ui/page";
 import { requireTenantUser } from "@/lib/auth/guard";
 import { withPageGuard } from "@/lib/auth/page-guard";
 
@@ -21,6 +21,12 @@ export default async function TenantStorePage() {
 
   return (
     <PageShell width="form">
+      <Breadcrumb
+        items={[
+          { href: "/tenant", label: "テナント管理" },
+          { href: "/tenant/store", label: "店舗ページ" },
+        ]}
+      />
       <PageHeader
         title="店舗ページ"
         description="公開ページの URL と紹介文を設定します。"
@@ -43,9 +49,6 @@ export default async function TenantStorePage() {
         }}
       />
 
-      <p className="text-sm">
-        <TextLink href="/tenant">テナント管理へ戻る</TextLink>
-      </p>
     </PageShell>
   );
 }

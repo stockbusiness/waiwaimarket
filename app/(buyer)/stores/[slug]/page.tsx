@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { PageHeader, PageShell } from "@/components/ui/page";
+import { Breadcrumb, PageHeader, PageShell, SectionHeader } from "@/components/ui/page";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -32,6 +32,12 @@ export default async function StorePage(props: PageProps<"/stores/[slug]">) {
 
   return (
     <PageShell>
+      <Breadcrumb
+        items={[
+          { href: "/", label: "トップ" },
+          { href: `/stores/${slug}`, label: store.display_name },
+        ]}
+      />
       <PageHeader
         title={store.display_name}
         description={
@@ -42,13 +48,13 @@ export default async function StorePage(props: PageProps<"/stores/[slug]">) {
       />
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-medium">取扱商品</h2>
+        <SectionHeader title="取扱商品" />
         <p className="text-sm text-muted">商品一覧はフェーズ2 で追加します。</p>
       </section>
 
       {legal ? (
         <section className="flex flex-col gap-3 border-t border-line pt-6">
-          <h2 className="text-lg font-medium">特定商取引法に基づく表記</h2>
+          <SectionHeader title="特定商取引法に基づく表記" />
           <dl className="flex flex-col gap-2 text-sm">
             <Row label="販売事業者">{legal.legal_name}</Row>
             <Row label="代表責任者">{legal.representative_name}</Row>

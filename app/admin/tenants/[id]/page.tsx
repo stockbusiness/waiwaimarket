@@ -2,8 +2,7 @@ import { notFound } from "next/navigation";
 
 import { TenantReviewActions } from "@/components/admin/tenant-review-actions";
 import { Alert, Badge } from "@/components/ui/alert";
-import { TextLink } from "@/components/ui/button";
-import { Card, PageHeader, PageShell } from "@/components/ui/page";
+import { Breadcrumb, Card, PageHeader, PageShell } from "@/components/ui/page";
 import { requireHqOperator } from "@/lib/auth/guard";
 import { withPageGuard } from "@/lib/auth/page-guard";
 import type { TenantStatus } from "@/lib/supabase/database.types";
@@ -58,10 +57,16 @@ export default async function AdminTenantDetailPage(
 
   return (
     <PageShell>
+      <Breadcrumb
+        items={[
+          { href: "/admin", label: "本部管理" },
+          { href: "/admin/tenants", label: "テナント審査" },
+          { href: `/admin/tenants/${tenant.id}`, label: tenant.name },
+        ]}
+      />
       <PageHeader
         title={tenant.name}
         description={<Badge>{STATUS_LABEL[tenant.status]}</Badge>}
-        actions={<TextLink href="/admin/tenants">一覧へ戻る</TextLink>}
       />
 
       <section className="flex flex-col gap-2">
