@@ -98,6 +98,25 @@ const checks = [
     },
   },
   {
+    name: "商品一覧が開く",
+    run: async () => {
+      const res = await fetch(`${baseUrl}/products`, { redirect: "manual" });
+      return { ok: res.status === 200, detail: `HTTP ${res.status}` };
+    },
+  },
+  {
+    name: "商品一覧の絞り込みが 500 にならない",
+    run: async () => {
+      // 存在しないカテゴリー・記号入りの検索語・範囲外のページ番号を同時に渡す。
+      // 0 件になるのが正しく、落ちてはいけない
+      const res = await fetch(
+        `${baseUrl}/products?category=no-such-category&q=%25&page=9999`,
+        { redirect: "manual" },
+      );
+      return { ok: res.status === 200, detail: `HTTP ${res.status}` };
+    },
+  },
+  {
     name: "存在しない店舗ページが 404 を返す",
     run: async () => {
       const res = await fetch(`${baseUrl}/stores/no-such-store-xyz`, { redirect: "manual" });

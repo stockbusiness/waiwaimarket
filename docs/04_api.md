@@ -39,6 +39,12 @@ cookie を使わない経路はこの規約の対象外とする。
 
 • GET /api/market/stores/{id}
 
+　上の 3 つは未実装。商品一覧（`/products`）・商品詳細（`/products/{id}`）・
+　店舗ページ（`/stores/{slug}`）はサーバー側で描画し、RLS 越しに直接読むため、
+　ブラウザから叩く API を必要としない。カートを非同期で操作するフェーズ3 で
+　必要になった時点で作る。公開判定はいずれの経路でも RLS が持つ
+　（`products_public_read` が承認済み商品かつ承認済みテナントに限る）。
+
 • POST /api/market/cart/items
 
 • POST /api/market/checkout/preview（在庫引当・ポイント予約を開始）

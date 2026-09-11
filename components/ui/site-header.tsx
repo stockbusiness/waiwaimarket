@@ -30,8 +30,7 @@ function Bar({ children }: { children: ReactNode }) {
 /**
  * 購入者面のヘッダー。
  *
- * 下段の 2 つは「探す側」と「売る側」の入口。商品一覧はフェーズ2 で作るため、
- * 「商品を探す」は当面その案内ページ（トップ）へ向ける。
+ * 下段の 2 つは「探す側」と「売る側」の入口。
  */
 export function BuyerHeader() {
   return (
@@ -46,7 +45,7 @@ export function BuyerHeader() {
         </Link>
       </div>
       <div className="grid grid-cols-2 gap-3 pb-3">
-        <ButtonLink href="/" className="w-full">
+        <ButtonLink href="/products" className="w-full">
           商品を探す
         </ButtonLink>
         <ButtonLink href="/tenant/login" variant="secondary" className="w-full">

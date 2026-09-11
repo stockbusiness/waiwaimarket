@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 
+import { ProductGrid } from "@/components/buyer/product-card";
+import { TextLink } from "@/components/ui/button";
 import { Breadcrumb, PageHeader, PageShell, SectionHeader } from "@/components/ui/page";
+import { listPublicProducts } from "@/lib/products/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -21,6 +24,9 @@ export default async function StorePage(props: PageProps<"/stores/[slug]">) {
     .maybeSingle();
 
   if (!store) notFound();
+
+  // 店舗の商品。公開判定は RLS が持つので、ここでは店舗で絞るだけ
+  const products = await listPublicProducts({ store: slug });
 
   const { data: legal } = await supabase
     .from("tenant_legal_profiles")
@@ -47,9 +53,22 @@ export default async function StorePage(props: PageProps<"/stores/[slug]">) {
         }
       />
 
-      <section className="flex flex-col gap-2">
-        <SectionHeader title="取扱商品" />
-        <p className="text-sm text-muted">商品一覧はフェーズ2 で追加します。</p>
+      <section className="flex flex-col gap-3">
+        <SectionHeader
+          title="取扱商品"
+          action={
+            products.total > products.items.length ? (
+              <TextLink href={`/products?store=${slug}`}>
+                すべて見る（{products.total} 件）
+              </TextLink>
+            ) : null
+          }
+        />
+        {products.items.length === 0 ? (
+          <p className="text-sm text-muted">公開されている商品がありません。</p>
+        ) : (
+          <ProductGrid products={products.items} />
+        )}
       </section>
 
       {legal ? (

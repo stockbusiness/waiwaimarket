@@ -204,3 +204,29 @@ SQL Editor 用に単一の SELECT にまとめた
 本部の審査も同じ型を通るため、型で制限すると正当な書き込みができなくなる。
 テナントを止めているのはトリガ（`products_guard_review_columns()`）であって
 型ではない。型のコメントにその旨を書いてある。
+
+### 公開画面（フェーズ2-4）で決めたこと
+
+**`products` と `stores` の間に外部キーは無い。**
+どちらも `tenants` を指す兄弟の関係なので、PostgREST の埋め込み
+（`select("...stores(...)")`）では解決できない。テナントIDで引き直して
+JavaScript 側で突き合わせる（`lib/products/public.ts`）。手書きの
+`database.types.ts` は `Relationships: []` なので型でも弾かれるが、
+本物のスキーマにも無いので実行時にも失敗する。
+
+**検索語の `%` と `_` を必ずエスケープする。**
+`ilike` はこの 2 文字をワイルドカードとして解釈する。利用者が `%` と
+打つだけで全件に一致する（ローカルの PostgreSQL で実際に確認した）。
+`escapeLikePattern()` を通すこと。
+
+**公開判定をアプリ側に書かない。**
+`status='approved'` の条件はアプリに置かず、RLS
+（`products_public_read`）だけに持たせる。2 か所に分けると、片方だけ
+直したときに未承認商品が漏れる。一覧・詳細・店舗ページ・トップの
+どこも、絞り込み条件しか書いていない。
+
+**flex の子は幅を明示する。**
+一覧の札（`components/buyer/product-card.tsx`）で `a` に `w-full` を
+付け忘れ、画像のある札だけ `img` に押し広げられて、画像の無い札が
+20px 細くなっていた。目視では気づきにくいので、Chromium で
+`getBoundingClientRect()` を測って見つけた。
