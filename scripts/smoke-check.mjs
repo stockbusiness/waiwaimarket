@@ -124,6 +124,18 @@ const checks = [
     },
   },
   {
+    name: "商品 API が未認証を 401 で弾く",
+    run: async () => {
+      const res = await fetch(`${baseUrl}/tenant/api/products`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tenantId: "00000000-0000-4000-8000-000000000000" }),
+        redirect: "manual",
+      });
+      return { ok: res.status === 401, detail: `HTTP ${res.status}` };
+    },
+  },
+  {
     name: "未ログインで /admin/mfa はログイン画面へ飛ぶ",
     run: async () => {
       const res = await fetch(`${baseUrl}/admin/mfa`, { redirect: "manual" });

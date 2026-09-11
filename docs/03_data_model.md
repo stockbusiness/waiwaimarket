@@ -20,13 +20,13 @@
 
 • product_categories：商品カテゴリー。親子関係、表示順、公開状態
 
-• products：商品基本情報
+• products：商品基本情報。審査状態、審査実行者・日時、審査の所見（review_note。差戻しの理由をテナントへ伝える。本部のみが書ける）
 
 • product_variants：サイズ・色・SKU・価格
 
 • product_images：商品画像
 
-• inventories：在庫数、引当数
+• inventories：在庫数、引当数。在庫数はテナントが編集でき、引当数はサーバー処理だけが動かす（テナントが下げると引当中の在庫を二重に売れる）
 
 • inventory_reservations：購入手続き中の引当（有効期限付き）
 

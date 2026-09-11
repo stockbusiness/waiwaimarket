@@ -9,6 +9,12 @@
  */
 
 export type HqRole = "hq_admin" | "hq_operator";
+export type ProductStatus =
+  | "draft"
+  | "submitted"
+  | "approved"
+  | "rejected"
+  | "suspended";
 export type TenantMemberRole = "owner" | "staff";
 export type TenantStatus =
   | "applied"
@@ -200,6 +206,130 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      product_categories: {
+        Row: {
+          id: string;
+          parent_id: string | null;
+          name: string;
+          slug: string;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          parent_id?: string | null;
+          name: string;
+          slug: string;
+          sort_order?: number;
+          is_active?: boolean;
+        };
+        Update: {
+          parent_id?: string | null;
+          name?: string;
+          slug?: string;
+          sort_order?: number;
+          is_active?: boolean;
+        };
+        Relationships: [];
+      };
+      products: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          title: string;
+          description: string | null;
+          category_id: string | null;
+          status: ProductStatus;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          review_note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          tenant_id: string;
+          title: string;
+          description?: string | null;
+          category_id?: string | null;
+          status?: ProductStatus;
+        };
+        /**
+         * 審査列（reviewed_by / reviewed_at / review_note）はここに出さない。
+         * 0010 の products_guard_review_columns() がテナントからの変更を
+         * 例外で拒否するため、型でも触れないようにしておく。
+         * 本部の審査は lib/products/review.ts が service_role で書く。
+         */
+        Update: {
+          title?: string;
+          description?: string | null;
+          category_id?: string | null;
+          status?: ProductStatus;
+        };
+        Relationships: [];
+      };
+      product_variants: {
+        Row: {
+          id: string;
+          product_id: string;
+          sku: string;
+          option_label: string | null;
+          price_incl_tax: number;
+          tax_rate: number;
+          is_active: boolean;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          sku: string;
+          option_label?: string | null;
+          price_incl_tax: number;
+          tax_rate?: number;
+          is_active?: boolean;
+        };
+        Update: {
+          sku?: string;
+          option_label?: string | null;
+          price_incl_tax?: number;
+          tax_rate?: number;
+          is_active?: boolean;
+        };
+        Relationships: [];
+      };
+      product_images: {
+        Row: {
+          id: string;
+          product_id: string;
+          storage_path: string;
+          sort_order: number;
+        };
+        Insert: {
+          product_id: string;
+          storage_path: string;
+          sort_order?: number;
+        };
+        Update: {
+          storage_path?: string;
+          sort_order?: number;
+        };
+        Relationships: [];
+      };
+      inventories: {
+        Row: {
+          variant_id: string;
+          quantity: number;
+          reserved_quantity: number;
+        };
+        Insert: {
+          variant_id: string;
+          quantity?: number;
+        };
+        /** 引当数は 0010 のトリガでサーバー処理だけに限っている */
+        Update: {
+          quantity?: number;
+        };
+        Relationships: [];
+      };
       site_pages: {
         Row: {
           id: string;
@@ -262,6 +392,7 @@ export type Database = {
     Enums: {
       hq_role: HqRole;
       tenant_status: TenantStatus;
+      product_status: ProductStatus;
     };
     CompositeTypes: Record<never, never>;
   };

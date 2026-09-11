@@ -35,6 +35,14 @@ export async function readApiError(
     // 同じ対象を同時に保存したときの衝突。片方の変更を消さずにやり直させる
     case "conflict":
       return "ほかの担当者が先に保存しました。画面を再読み込みしてやり直してください。";
+    case "sku_taken":
+      return "その SKU はこの商品ですでに使われています。";
+    case "in_use":
+      return "注文やカートから参照されている SKU は削除できません。販売を止める設定にしてください。";
+    case "too_many_images":
+      return "画像は 10 枚までです。";
+    case "invalid_parent":
+      return "自分自身を親カテゴリーにはできません。";
     case "not_found":
       return "対象が見つかりませんでした。";
     case "invalid_transition":

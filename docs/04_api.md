@@ -63,11 +63,19 @@ cookie を使わない経路はこの規約の対象外とする。
 
 • PUT /tenant/api/legal-profile（特定商取引法に基づく表記。同上）
 
-• POST /tenant/api/products
+• POST /tenant/api/products（本体のみ。画像は `<tenant_id>/<product_id>/...` に置くため、商品IDが決まってから登録する）
 
-• PATCH /tenant/api/products/{id}
+• PATCH /tenant/api/products/{id}（本体。公開中の商品の本文を直すと審査待ちへ戻る）
 
-• POST /tenant/api/products/{id}/submit
+• PUT /tenant/api/products/{id}/variants（SKU・価格・在庫の一括保存。送られてこなかった既存行は削除）
+
+• POST /tenant/api/products/{id}/images（Storage へ上げ終わった画像の登録。実体はブラウザから直接 Storage へ）
+
+• DELETE /tenant/api/products/{id}/images/{imageId}
+
+• POST /tenant/api/products/{id}/submit（審査に出す）
+
+• DELETE /tenant/api/products/{id}/submit（提出の取り下げ。審査待ちのあいだだけ）
 
 • GET /tenant/api/orders
 
@@ -95,6 +103,12 @@ cookie を使わない経路はこの規約の対象外とする。
 
   停止と復帰を本部管理者に限るのは docs/00 5.4 の権限表による
   （オペレーターはルール変更・精算確定・手動調整が不可）。
+
+• POST /admin/api/categories、PUT /admin/api/categories/{id}
+
+  商品カテゴリーの追加・更新（docs/00 5.3）。本部管理者のみ。削除は用意しない。
+  商品から参照されているカテゴリーを消すと、どの棚にあった商品か分からなくなる。
+  使わなくなったものは `is_active` を落とす。
 
 • POST /admin/api/pages
 

@@ -337,9 +337,163 @@ select '本部は下書きを含めてサイトページを読める', '2', curr
        case when current_setting('verify.v') = '2' then 'PASS' else 'FAIL' end;
 
 -- ------------------------------------------------------------
+-- 7. 商品は承認されたものだけが外に出る（0002・0004・0010）
+--
+-- テナント1 に、公開中・審査待ち・差し戻しの 3 つを用意する。
+-- テナント3（未承認）にも公開中の商品を置き、テナントの状態でも
+-- 止まることを確かめる。
+-- ------------------------------------------------------------
+insert into products (id, tenant_id, title, status) values
+  ('f0000000-0000-4000-8000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', '検証・公開中', 'approved'),
+  ('f0000000-0000-4000-8000-000000000002', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', '検証・審査待ち', 'submitted'),
+  -- 他テナントの「未公開」商品。承認済みの商品は公開情報なので、
+  -- テナント利用者から見えて当然（products_public_read が誰にでも許す）。
+  -- 隠れていなければならないのは審査前の商品のほう。
+  ('f0000000-0000-4000-8000-000000000003', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1', '検証・他テナント未公開', 'submitted'),
+  ('f0000000-0000-4000-8000-000000000004', 'cccccccc-cccc-cccc-cccc-ccccccccccc1', '検証・未承認テナント', 'approved');
+
+insert into product_variants (id, product_id, sku, price_incl_tax) values
+  ('f1000000-0000-4000-8000-000000000001', 'f0000000-0000-4000-8000-000000000001', 'VERIFY-1', 1000),
+  ('f1000000-0000-4000-8000-000000000002', 'f0000000-0000-4000-8000-000000000002', 'VERIFY-2', 2000);
+
+insert into inventories (variant_id, quantity) values
+  ('f1000000-0000-4000-8000-000000000001', 5),
+  ('f1000000-0000-4000-8000-000000000002', 5);
+
+set role anon;
+set request.jwt.claim.sub = '';
+set request.jwt.claims = '{"role":"anon"}';
+
+select set_config('verify.v',
+  (select count(*)::text from products where id = 'f0000000-0000-4000-8000-000000000001'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は承認済みテナントの公開中商品を読める', '1', current_setting('verify.v'),
+       case when current_setting('verify.v') = '1' then 'PASS' else 'FAIL' end;
+
+set role anon;
+select set_config('verify.v',
+  (select count(*)::text from products where id = 'f0000000-0000-4000-8000-000000000002'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は審査待ちの商品を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 商品が approved でも、テナントが未承認なら公開しない（0004 の是正点）
+set role anon;
+select set_config('verify.v',
+  (select count(*)::text from products where id = 'f0000000-0000-4000-8000-000000000004'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は未承認テナントの商品を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 価格と在庫も、商品が公開されていなければ出さない
+set role anon;
+select set_config('verify.v',
+  (select count(*)::text from product_variants
+   where id = 'f1000000-0000-4000-8000-000000000002'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は審査待ち商品の SKU を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+set role anon;
+select set_config('verify.v',
+  (select count(*)::text from inventories
+   where variant_id = 'f1000000-0000-4000-8000-000000000002'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は審査待ち商品の在庫を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- テナントは他店の商品を読めない
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+select set_config('verify.v',
+  (select count(*)::text from products where id = 'f0000000-0000-4000-8000-000000000003'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select 'テナントは他店の未公開商品を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- テナントは自分で承認できない（0010 のトリガ）
+set role authenticated;
+do $$
+begin
+  update products set status = 'approved'
+   where id = 'f0000000-0000-4000-8000-000000000002';
+  perform set_config('verify.v', (select count(*)::text from products
+    where id = 'f0000000-0000-4000-8000-000000000002' and status = 'approved'), false);
+exception when others then
+  perform set_config('verify.v', '0', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select 'テナントは自分の商品を承認できない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- テナントは審査の所見を書き換えられない（0010）
+reset role;
+update products set review_note = '本部が書いた所見'
+ where id = 'f0000000-0000-4000-8000-000000000002';
+
+set role authenticated;
+do $$
+begin
+  update products set review_note = '書き換え'
+   where id = 'f0000000-0000-4000-8000-000000000002';
+  perform set_config('verify.v', (select count(*)::text from products
+    where id = 'f0000000-0000-4000-8000-000000000002' and review_note = '書き換え'), false);
+exception when others then
+  perform set_config('verify.v', '0', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select 'テナントは審査の所見を書き換えられない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- テナントは引当数を動かせない（0010）。動かせると引当中の在庫を二重に売れる
+set role authenticated;
+do $$
+begin
+  update inventories set reserved_quantity = 3
+   where variant_id = 'f1000000-0000-4000-8000-000000000001';
+  perform set_config('verify.v', (select count(*)::text from inventories
+    where variant_id = 'f1000000-0000-4000-8000-000000000001' and reserved_quantity = 3), false);
+exception when others then
+  perform set_config('verify.v', '0', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select 'テナントは引当数を変更できない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- テナントは自店の在庫数を更新できる（ポリシーが厳しすぎないことの確認）
+set role authenticated;
+do $$
+begin
+  update inventories set quantity = 42
+   where variant_id = 'f1000000-0000-4000-8000-000000000001';
+  perform set_config('verify.v', (select count(*)::text from inventories
+    where variant_id = 'f1000000-0000-4000-8000-000000000001' and quantity = 42), false);
+exception when others then
+  perform set_config('verify.v', '0', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select 'テナントは自店の在庫数を更新できる', '1', current_setting('verify.v'),
+       case when current_setting('verify.v') = '1' then 'PASS' else 'FAIL' end;
+
+-- ------------------------------------------------------------
 -- 後片付け
 -- ------------------------------------------------------------
 reset role;
+delete from products where id in ('f0000000-0000-4000-8000-000000000001',
+                                  'f0000000-0000-4000-8000-000000000002',
+                                  'f0000000-0000-4000-8000-000000000003',
+                                  'f0000000-0000-4000-8000-000000000004');
 update site_pages set is_published = false, published_revision_id = null
  where slug in ('verify-published', 'verify-draft');
 delete from site_pages where slug in ('verify-published', 'verify-draft');
