@@ -76,6 +76,7 @@ export default async function TenantHome() {
                     {isOwner && !stripeDone ? (
                       <TextLink href="/tenant/onboarding">Stripe の手続きへ</TextLink>
                     ) : null}
+                    <TextLink href="/tenant/products">商品</TextLink>
                     <TextLink href="/tenant/store">店舗ページ</TextLink>
                     {isOwner ? (
                       <TextLink href="/tenant/settings/legal">事業者情報</TextLink>

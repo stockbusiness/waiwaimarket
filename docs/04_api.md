@@ -63,11 +63,19 @@ cookie を使わない経路はこの規約の対象外とする。
 
 • PUT /tenant/api/legal-profile（特定商取引法に基づく表記。同上）
 
-• POST /tenant/api/products
+• POST /tenant/api/products（本体のみ。画像は `<tenant_id>/<product_id>/...` に置くため、商品IDが決まってから登録する）
 
-• PATCH /tenant/api/products/{id}
+• PATCH /tenant/api/products/{id}（本体。公開中の商品の本文を直すと審査待ちへ戻る）
 
-• POST /tenant/api/products/{id}/submit
+• PUT /tenant/api/products/{id}/variants（SKU・価格・在庫の一括保存。送られてこなかった既存行は削除）
+
+• POST /tenant/api/products/{id}/images（Storage へ上げ終わった画像の登録。実体はブラウザから直接 Storage へ）
+
+• DELETE /tenant/api/products/{id}/images/{imageId}
+
+• POST /tenant/api/products/{id}/submit（審査に出す）
+
+• DELETE /tenant/api/products/{id}/submit（提出の取り下げ。審査待ちのあいだだけ）
 
 • GET /tenant/api/orders
 
@@ -95,6 +103,28 @@ cookie を使わない経路はこの規約の対象外とする。
 
   停止と復帰を本部管理者に限るのは docs/00 5.4 の権限表による
   （オペレーターはルール変更・精算確定・手動調整が不可）。
+
+• POST /admin/api/categories、PUT /admin/api/categories/{id}
+
+  商品カテゴリーの追加・更新（docs/00 5.3）。本部管理者のみ。削除は用意しない。
+  商品から参照されているカテゴリーを消すと、どの棚にあった商品か分からなくなる。
+  使わなくなったものは `is_active` を落とす。
+
+• POST /admin/api/pages
+
+  サイト共通ページの新規作成。本文は同時に 1 版目として保存する。本部管理者のみ。
+
+• PUT /admin/api/pages/{id}
+
+  サイト共通ページの保存。本文は必ず新しい版として積む。`publish` が真なら
+  その版を公開版にする。本部管理者のみ。
+
+• POST /admin/api/pages/{id}
+
+  `action: "unpublish"` で公開を取り下げる。本文（版）は残る。本部管理者のみ。
+
+公開側は API を持たず、`/legal/{slug}` のページが RLS 越しに直接読む。
+公開していないページと版は匿名から読めない。
 
 本部の機能範囲は docs/00 5.3 に定める。商品審査、カテゴリー管理、手数料率設定、
 ポイント設定、手動付与・取消などの API は、各フェーズで実装する際にここへ追記する。
