@@ -178,6 +178,17 @@ cookie を使わない経路はこの規約の対象外とする。
 
 • POST /api/internal/points/expire（バッチ）
 
+## 9.4.1 バッチ（Vercel Cron）
+
+• GET /api/cron/release-reservations
+
+  期限切れの在庫引当を解放する（docs/06 4.2）。5 分ごと。
+  `Authorization: Bearer <CRON_SECRET>` で照合する。冪等。
+
+  **このバッチが遅れても売り過ぎは起きない。** 引当の直前に、その SKU の
+  期限切れをその場で解放しているため（0011 `release_expired_for_variant`）。
+  ここは後片付けであって、正しさの担保ではない。
+
 ## 9.5 決済 内部API
 
 • POST /api/webhooks/stripe

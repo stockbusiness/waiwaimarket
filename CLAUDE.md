@@ -230,3 +230,39 @@ JavaScript 側で突き合わせる（`lib/products/public.ts`）。手書きの
 付け忘れ、画像のある札だけ `img` に押し広げられて、画像の無い札が
 20px 細くなっていた。目視では気づきにくいので、Chromium で
 `getBoundingClientRect()` を測って見つけた。
+
+### 在庫引当（0011）で決めたこと
+
+**`revoke ... from public` では権限が外れない。**
+Supabase は `alter default privileges in schema public grant all on
+functions to anon, authenticated, service_role` を設定してあるため、
+public スキーマに関数を作った時点で anon と authenticated に EXECUTE が
+**明示的に**付く。PUBLIC 経由ではないので `from public` では外れない。
+`revoke all on function ... from public, anon, authenticated` と
+名指しで剥がすこと。実際に 0011 で踏み、`pg_default_acl` と `proacl` を
+見て気づいた。`verify_permissions.sql` が `has_function_privilege()` で
+固定してある（呼んで例外になるかで測ると、内側の関数で弾かれて
+PASS のままになり、緩めたことを検出できない）。
+
+**引当は 1 文の UPDATE で決める。**
+`update inventories set reserved_quantity = reserved_quantity + n
+ where variant_id = v and quantity - reserved_quantity >= n`
+この UPDATE が行ロックを取るため、同時に走った 2 つ目は 1 つ目の確定を
+待ってから条件を評価し直す。アプリ側で「読んで、確かめて、書く」と
+書くと、その隙間で二重に売れる。在庫 2 点に 5 接続を同時にぶつけて
+ちょうど 2 件だけ成立することを実測した。
+
+**関数は `security definer` にしない。**
+実行権限は service_role だけに与えるが、万一広げてしまっても invoker
+なら RLS と `inventories_guard_reserved` が効いて書き込みを拒否する。
+definer にするとその最後の壁が無くなる。実際、権限が開いていた間も
+匿名からの呼び出しは NULL を返すだけで何も変えられなかった。
+
+**バッチを正しさの担保にしない。**
+引当の直前に、その SKU の期限切れをその場で解放する
+（`release_expired_for_variant`）。これが無いと、Cron が回るまで在庫が
+押さえられたままになり、正しさが実行間隔に依存する。Cron は後片付け。
+
+**`expires_at` を過去にするだけでは期限切れを再現できない。**
+0003 に `expires_at > created_at` の検査制約があるため、`created_at` も
+一緒に戻す必要がある。テストを書くときに引っかかる。

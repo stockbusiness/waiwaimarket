@@ -560,6 +560,61 @@ select '匿名は審査待ちの商品の画像を読めない', '0', current_se
        case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
 
 -- ------------------------------------------------------------
+-- 9. 在庫引当はサーバー処理だけが行う（0011）
+--
+-- 匿名やテナントから引当関数を呼べると、在庫を押さえ続けて商品を
+-- 買えなくできる（在庫枯渇攻撃）。実行権限を service_role に限っている。
+-- ------------------------------------------------------------
+-- 実行権限そのものを見る。
+--
+-- 「呼んでみて例外になるか」で測ると、外側の関数の権限を緩めても
+-- 内側の関数（release_expired_for_variant）で弾かれて PASS のままになり、
+-- 緩めたことを検出できない。付与の状態を直接確かめる。
+--
+-- Supabase の default privileges が public スキーマの関数に anon と
+-- authenticated への EXECUTE を自動で付けるため、0011 で名指しの
+-- revoke が要る。それが効いていることの確認でもある。
+select set_config('verify.v',
+  (select count(*)::text
+   from pg_proc p
+   join pg_namespace n on n.oid = p.pronamespace
+   cross join (values ('anon'), ('authenticated')) as r(role_name)
+   where n.nspname = 'public'
+     and p.proname in ('reserve_inventory', 'release_reservation',
+                       'release_expired_reservations', 'release_expired_for_variant')
+     and has_function_privilege(r.role_name, p.oid, 'execute')), false);
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名・ログイン利用者に引当関数の実行権限が無い', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+begin
+  perform release_expired_reservations();
+  perform set_config('verify.v', '1', false);
+exception when insufficient_privilege then
+  perform set_config('verify.v', '0', false);
+when others then
+  perform set_config('verify.v', '1', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select 'テナントは引当解放バッチを実行できない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 引当そのものの行も外から見えない（0004：ポリシーを置いていない）
+set role anon;
+set request.jwt.claims = '{"role":"anon"}';
+select set_config('verify.v',
+  (select count(*)::text from inventory_reservations), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は引当の明細を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- ------------------------------------------------------------
 -- 後片付け
 -- ------------------------------------------------------------
 reset role;

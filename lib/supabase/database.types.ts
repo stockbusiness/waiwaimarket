@@ -394,6 +394,28 @@ export type Database = {
         Args: Record<string, never>;
         Returns: string | null;
       };
+      /**
+       * 在庫引当（0011）。成功なら引当ID、在庫不足なら null。
+       * 実行権限は service_role のみ。
+       */
+      reserve_inventory: {
+        Args: {
+          p_variant_id: string;
+          p_quantity: number;
+          p_cart_id?: string | null;
+          p_order_id?: string | null;
+        };
+        Returns: string | null;
+      };
+      release_reservation: {
+        Args: { p_reservation_id: string };
+        Returns: boolean;
+      };
+      /** 期限切れをまとめて解放し、件数を返す。冪等 */
+      release_expired_reservations: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
     };
     Enums: {
       hq_role: HqRole;
