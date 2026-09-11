@@ -28,7 +28,7 @@
 
 • inventories：在庫数、引当数。在庫数はテナントが編集でき、引当数はサーバー処理だけが動かす（テナントが下げると引当中の在庫を二重に売れる）
 
-• inventory_reservations：購入手続き中の引当（有効期限付き）
+• inventory_reservations：購入手続き中の引当（有効期限付き。TTL 15分）。RLS 有効・ポリシーなしで、引当と解放は 0011 の関数を service_role から呼ぶ経路のみ
 
 • shipping_profiles：送料・配送地域・発送日数
 

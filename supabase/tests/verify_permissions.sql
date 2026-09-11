@@ -487,9 +487,138 @@ select 'テナントは自店の在庫数を更新できる', '1', current_setti
        case when current_setting('verify.v') = '1' then 'PASS' else 'FAIL' end;
 
 -- ------------------------------------------------------------
+-- 8. 公開画面が読む経路（フェーズ2-4）
+--
+-- 一覧は products を店舗・カテゴリーで絞る。絞り込みの経路からも
+-- 未公開のものが漏れないことを確かめる。
+-- ------------------------------------------------------------
+insert into product_categories (id, name, slug) values
+  ('c1111111-0000-4000-8000-00000000000a', '検証カテゴリー', 'verify-category');
+
+update products set category_id = 'c1111111-0000-4000-8000-00000000000a'
+ where id in ('f0000000-0000-4000-8000-000000000001',
+              'f0000000-0000-4000-8000-000000000002',
+              'f0000000-0000-4000-8000-000000000004');
+
+set role anon;
+set request.jwt.claim.sub = '';
+set request.jwt.claims = '{"role":"anon"}';
+
+-- カテゴリーで絞っても、公開中の 1 件だけ（審査待ちと未承認テナントは出ない）
+select set_config('verify.v',
+  (select count(*)::text from products p
+   join product_categories c on c.id = p.category_id
+   where c.slug = 'verify-category' and c.is_active = true), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名はカテゴリー絞り込みでも公開中の商品しか見えない', '1', current_setting('verify.v'),
+       case when current_setting('verify.v') = '1' then 'PASS' else 'FAIL' end;
+
+-- 店舗で絞る経路。未承認テナントの店舗はそもそも引けない
+set role anon;
+select set_config('verify.v',
+  (select count(*)::text from products p
+   join stores s on s.tenant_id = p.tenant_id
+   where s.slug = 'verify-pending-3'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は未承認テナントの店舗から商品を辿れない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 商品名の部分一致。審査待ちの商品名で検索してもヒットしない
+set role anon;
+select set_config('verify.v',
+  (select count(*)::text from products where title ilike '%検証・審査待ち%'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は商品名検索で審査待ちの商品を見つけられない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 公開中の商品の画像は読める（一覧の代表画像に要る）
+insert into product_images (product_id, storage_path, sort_order) values
+  ('f0000000-0000-4000-8000-000000000001',
+   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1/f0000000-0000-4000-8000-000000000001/a.png', 0),
+  ('f0000000-0000-4000-8000-000000000002',
+   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1/f0000000-0000-4000-8000-000000000002/b.png', 0);
+
+set role anon;
+select set_config('verify.v',
+  (select count(*)::text from product_images
+   where product_id = 'f0000000-0000-4000-8000-000000000001'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は公開中の商品の画像を読める', '1', current_setting('verify.v'),
+       case when current_setting('verify.v') = '1' then 'PASS' else 'FAIL' end;
+
+set role anon;
+select set_config('verify.v',
+  (select count(*)::text from product_images
+   where product_id = 'f0000000-0000-4000-8000-000000000002'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は審査待ちの商品の画像を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- ------------------------------------------------------------
+-- 9. 在庫引当はサーバー処理だけが行う（0011）
+--
+-- 匿名やテナントから引当関数を呼べると、在庫を押さえ続けて商品を
+-- 買えなくできる（在庫枯渇攻撃）。実行権限を service_role に限っている。
+-- ------------------------------------------------------------
+-- 実行権限そのものを見る。
+--
+-- 「呼んでみて例外になるか」で測ると、外側の関数の権限を緩めても
+-- 内側の関数（release_expired_for_variant）で弾かれて PASS のままになり、
+-- 緩めたことを検出できない。付与の状態を直接確かめる。
+--
+-- Supabase の default privileges が public スキーマの関数に anon と
+-- authenticated への EXECUTE を自動で付けるため、0011 で名指しの
+-- revoke が要る。それが効いていることの確認でもある。
+select set_config('verify.v',
+  (select count(*)::text
+   from pg_proc p
+   join pg_namespace n on n.oid = p.pronamespace
+   cross join (values ('anon'), ('authenticated')) as r(role_name)
+   where n.nspname = 'public'
+     and p.proname in ('reserve_inventory', 'release_reservation',
+                       'release_expired_reservations', 'release_expired_for_variant')
+     and has_function_privilege(r.role_name, p.oid, 'execute')), false);
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名・ログイン利用者に引当関数の実行権限が無い', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+begin
+  perform release_expired_reservations();
+  perform set_config('verify.v', '1', false);
+exception when insufficient_privilege then
+  perform set_config('verify.v', '0', false);
+when others then
+  perform set_config('verify.v', '1', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select 'テナントは引当解放バッチを実行できない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 引当そのものの行も外から見えない（0004：ポリシーを置いていない）
+set role anon;
+set request.jwt.claims = '{"role":"anon"}';
+select set_config('verify.v',
+  (select count(*)::text from inventory_reservations), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は引当の明細を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- ------------------------------------------------------------
 -- 後片付け
 -- ------------------------------------------------------------
 reset role;
+delete from product_categories where slug = 'verify-category';
 delete from products where id in ('f0000000-0000-4000-8000-000000000001',
                                   'f0000000-0000-4000-8000-000000000002',
                                   'f0000000-0000-4000-8000-000000000003',

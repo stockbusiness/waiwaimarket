@@ -39,6 +39,12 @@ cookie を使わない経路はこの規約の対象外とする。
 
 • GET /api/market/stores/{id}
 
+　上の 3 つは未実装。商品一覧（`/products`）・商品詳細（`/products/{id}`）・
+　店舗ページ（`/stores/{slug}`）はサーバー側で描画し、RLS 越しに直接読むため、
+　ブラウザから叩く API を必要としない。カートを非同期で操作するフェーズ3 で
+　必要になった時点で作る。公開判定はいずれの経路でも RLS が持つ
+　（`products_public_read` が承認済み商品かつ承認済みテナントに限る）。
+
 • POST /api/market/cart/items
 
 • POST /api/market/checkout/preview（在庫引当・ポイント予約を開始）
@@ -171,6 +177,17 @@ cookie を使わない経路はこの規約の対象外とする。
 • POST /api/internal/points/confirm-pending（バッチ）
 
 • POST /api/internal/points/expire（バッチ）
+
+## 9.4.1 バッチ（Vercel Cron）
+
+• GET /api/cron/release-reservations
+
+  期限切れの在庫引当を解放する（docs/06 4.2）。5 分ごと。
+  `Authorization: Bearer <CRON_SECRET>` で照合する。冪等。
+
+  **このバッチが遅れても売り過ぎは起きない。** 引当の直前に、その SKU の
+  期限切れをその場で解放しているため（0011 `release_expired_for_variant`）。
+  ここは後片付けであって、正しさの担保ではない。
 
 ## 9.5 決済 内部API
 
