@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Field, TextArea, TextInput } from "@/components/ui/field";
 import { readApiError } from "@/lib/http/error-message";
 import { audienceApiPath } from "@/lib/supabase/audience";
 
@@ -64,42 +67,29 @@ export function TenantApplicationForm() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       {FIELDS.map((field) => (
-        <label key={field.name} className="flex flex-col gap-1 text-sm">
-          <span>
-            {field.label}
-            {field.required ? <span aria-hidden> *</span> : null}
-          </span>
+        <Field
+          key={field.name}
+          label={field.label}
+          required={field.required}
+          hint={field.hint}
+        >
           {field.multiline ? (
-            <textarea
-              name={field.name}
-              rows={4}
-              className="rounded border border-zinc-300 px-3 py-2 text-base"
-            />
+            <TextArea name={field.name} rows={4} />
           ) : (
-            <input
+            <TextInput
               name={field.name}
               type={field.type ?? "text"}
               required={field.required}
-              className="rounded border border-zinc-300 px-3 py-2 text-base"
             />
           )}
-          {field.hint ? <span className="text-xs text-zinc-500">{field.hint}</span> : null}
-        </label>
+        </Field>
       ))}
 
-      {error ? (
-        <p role="alert" className="text-sm text-red-700">
-          {error}
-        </p>
-      ) : null}
+      {error ? <Alert tone="error">{error}</Alert> : null}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
+      <Button type="submit" disabled={submitting}>
         {submitting ? "送信中…" : "出店を申請する"}
-      </button>
+      </Button>
     </form>
   );
 }

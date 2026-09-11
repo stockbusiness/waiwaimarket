@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { TenantReviewActions } from "@/components/admin/tenant-review-actions";
+import { Alert, Badge } from "@/components/ui/alert";
+import { TextLink } from "@/components/ui/button";
+import { Card, PageHeader, PageShell } from "@/components/ui/page";
 import { requireHqOperator } from "@/lib/auth/guard";
 import { withPageGuard } from "@/lib/auth/page-guard";
 import type { TenantStatus } from "@/lib/supabase/database.types";
@@ -54,49 +57,60 @@ export default async function AdminTenantDetailPage(
   );
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-12">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{tenant.name}</h1>
-        <p className="text-sm text-zinc-600">{STATUS_LABEL[tenant.status]}</p>
-      </header>
+    <PageShell>
+      <PageHeader
+        title={tenant.name}
+        description={<Badge>{STATUS_LABEL[tenant.status]}</Badge>}
+        actions={<TextLink href="/admin/tenants">一覧へ戻る</TextLink>}
+      />
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium">事業者情報</h2>
-        {legal ? (
-          <dl className="flex flex-col gap-1 text-sm">
-            <div className="flex gap-3"><dt className="w-28 text-zinc-600">登記名称</dt><dd>{legal.legal_name}</dd></div>
-            <div className="flex gap-3"><dt className="w-28 text-zinc-600">代表者</dt><dd>{legal.representative_name}</dd></div>
-            <div className="flex gap-3"><dt className="w-28 text-zinc-600">所在地</dt><dd>{legal.address}</dd></div>
-            <div className="flex gap-3"><dt className="w-28 text-zinc-600">電話</dt><dd>{legal.phone}</dd></div>
-            <div className="flex gap-3"><dt className="w-28 text-zinc-600">メール</dt><dd>{legal.email}</dd></div>
-            <div className="flex gap-3">
-              <dt className="w-28 text-zinc-600">登録番号</dt>
-              <dd>{legal.invoice_registration_number ?? "未登録"}</dd>
-            </div>
-          </dl>
-        ) : (
-          <p className="text-sm text-zinc-600">未登録です。</p>
-        )}
+        <Card>
+          {legal ? (
+            <dl className="flex flex-col gap-2 text-sm">
+              <Row label="登記名称">{legal.legal_name}</Row>
+              <Row label="代表者">{legal.representative_name}</Row>
+              <Row label="所在地">{legal.address}</Row>
+              <Row label="電話">{legal.phone}</Row>
+              <Row label="メール">{legal.email}</Row>
+              <Row label="登録番号">
+                {legal.invoice_registration_number ?? "未登録"}
+              </Row>
+            </dl>
+          ) : (
+            <p className="text-sm text-muted">未登録です。</p>
+          )}
+        </Card>
       </section>
 
       {blockers.length > 0 ? (
-        <section className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          <p className="font-medium">承認できない理由</p>
+        <Alert tone="warning">
+          承認できない理由があります。
           <ul className="mt-1 list-inside list-disc">
             {blockers.map((blocker) => (
               <li key={blocker}>{blocker}</li>
             ))}
           </ul>
-        </section>
+        </Alert>
       ) : null}
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium">操作</h2>
         <TenantReviewActions tenantId={tenant.id} actions={actions} />
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs leading-5 text-subtle">
           停止と停止解除は本部管理者のみが行えます（多要素認証が必要です）。
         </p>
       </section>
-    </main>
+    </PageShell>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
+      <dt className="shrink-0 text-muted sm:w-28">{label}</dt>
+      <dd>{children}</dd>
+    </div>
   );
 }

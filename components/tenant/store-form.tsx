@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Field, TextArea, TextInput } from "@/components/ui/field";
 import { readApiError } from "@/lib/http/error-message";
 import { audienceApiPath } from "@/lib/supabase/audience";
 
@@ -54,66 +57,61 @@ export function StoreForm({ tenantId, initial }: Props) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <label className="flex flex-col gap-1 text-sm">
-        店舗 URL
-        <span className="text-xs text-zinc-500">
-          /stores/&lt;この値&gt; で公開されます。英小文字・数字・ハイフン、3〜40 文字
-        </span>
-        <input
+      <Field
+        label="店舗 URL"
+        required
+        hint="/stores/&lt;この値&gt; で公開されます。英小文字・数字・ハイフン、3〜40 文字"
+      >
+        <TextInput
           name="slug"
           defaultValue={initial.slug}
           required
           pattern="[a-z0-9]+(-[a-z0-9]+)*"
           minLength={3}
           maxLength={40}
-          className="rounded border border-zinc-300 px-3 py-2 font-mono text-base"
+          className="font-mono"
         />
-      </label>
+      </Field>
 
-      <label className="flex flex-col gap-1 text-sm">
-        店舗名
-        <input
+      <Field label="店舗名" required>
+        <TextInput
           name="displayName"
           defaultValue={initial.displayName}
           required
           maxLength={60}
-          className="rounded border border-zinc-300 px-3 py-2 text-base"
         />
-      </label>
+      </Field>
 
-      <label className="flex flex-col gap-1 text-sm">
-        紹介文
-        <textarea
+      <Field label="紹介文">
+        <TextArea
           name="description"
           defaultValue={initial.description}
           rows={6}
           maxLength={2000}
-          className="rounded border border-zinc-300 px-3 py-2 text-base"
         />
-      </label>
+      </Field>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="isPublic" defaultChecked={initial.isPublic} />
-        店舗ページを公開する
-      </label>
-      <p className="text-xs text-zinc-500">
-        公開してもテナントが承認されるまでは表に出ません。
-      </p>
-
-      {error ? (
-        <p role="alert" className="text-sm text-red-700">
-          {error}
+      <div className="flex flex-col gap-1.5">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            name="isPublic"
+            defaultChecked={initial.isPublic}
+            className="size-4"
+          />
+          店舗ページを公開する
+        </label>
+        <p className="text-xs leading-5 text-subtle">
+          公開してもテナントが承認されるまでは表に出ません。
         </p>
-      ) : null}
-      {saved ? <p className="text-sm text-green-700">保存しました。</p> : null}
+      </div>
 
-      <button
-        type="submit"
-        disabled={busy}
-        className="w-fit rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
+      {error ? <Alert tone="error">{error}</Alert> : null}
+      {saved ? <Alert tone="success">保存しました。</Alert> : null}
+
+      <Button type="submit" disabled={busy} className="w-fit">
         {busy ? "保存中…" : "保存する"}
-      </button>
+      </Button>
     </form>
   );
 }

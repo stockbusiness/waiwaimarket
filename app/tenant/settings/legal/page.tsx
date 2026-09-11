@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { LegalProfileForm } from "@/components/tenant/legal-profile-form";
+import { TextLink } from "@/components/ui/button";
+import { PageHeader, PageShell } from "@/components/ui/page";
 import { requireTenantUser } from "@/lib/auth/guard";
 import { withPageGuard } from "@/lib/auth/page-guard";
 
@@ -23,14 +24,11 @@ export default async function TenantLegalPage() {
     .maybeSingle();
 
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-6 py-12">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">事業者情報</h1>
-        <p className="text-sm leading-6 text-zinc-600">
-          特定商取引法に基づく表記として、承認後は店舗ページに掲示されます。
-          編集できるのはテナント管理者のみです。
-        </p>
-      </header>
+    <PageShell width="form">
+      <PageHeader
+        title="事業者情報"
+        description="特定商取引法に基づく表記として、承認後は店舗ページに掲示されます。編集できるのはテナント管理者のみです。"
+      />
 
       <LegalProfileForm
         tenantId={owned.tenantId}
@@ -45,9 +43,9 @@ export default async function TenantLegalPage() {
         }}
       />
 
-      <Link href="/tenant" className="text-sm underline underline-offset-2">
-        テナント管理へ戻る
-      </Link>
-    </main>
+      <p className="text-sm">
+        <TextLink href="/tenant">テナント管理へ戻る</TextLink>
+      </p>
+    </PageShell>
   );
 }

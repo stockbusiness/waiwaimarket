@@ -1,5 +1,6 @@
-import Link from "next/link";
-
+import { Badge } from "@/components/ui/alert";
+import { TextLink } from "@/components/ui/button";
+import { Card, PageHeader, PageShell } from "@/components/ui/page";
 import { requireHqOperator } from "@/lib/auth/guard";
 import { withPageGuard } from "@/lib/auth/page-guard";
 import type { TenantStatus } from "@/lib/supabase/database.types";
@@ -26,27 +27,35 @@ export default async function AdminTenantsPage() {
   if (error) throw error;
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-12">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">テナント審査</h1>
-        <p className="text-sm text-zinc-600">{tenants?.length ?? 0} 件</p>
-      </header>
+    <PageShell width="wide">
+      <PageHeader title="テナント審査" description={`${tenants?.length ?? 0} 件`} />
 
-      <ul className="flex flex-col gap-2">
-        {(tenants ?? []).map((tenant) => (
-          <li key={tenant.id} className="rounded border border-zinc-200 p-4 text-sm">
-            <Link href={`/admin/tenants/${tenant.id}`} className="font-medium underline underline-offset-2">
-              {tenant.name}
-            </Link>
-            <p className="mt-1 text-zinc-600">
-              {STATUS_LABEL[tenant.status]}／Stripe：
-              {tenant.stripe_charges_enabled && tenant.stripe_payouts_enabled
-                ? "完了"
-                : "未完了"}
-            </p>
-          </li>
-        ))}
-      </ul>
-    </main>
+      {tenants && tenants.length > 0 ? (
+        <ul className="flex flex-col gap-3">
+          {tenants.map((tenant) => (
+            <li key={tenant.id}>
+              <Card>
+                <div className="flex flex-col gap-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <TextLink href={`/admin/tenants/${tenant.id}`}>
+                      <span className="font-medium">{tenant.name}</span>
+                    </TextLink>
+                    <Badge>{STATUS_LABEL[tenant.status]}</Badge>
+                  </div>
+                  <p className="text-muted">
+                    Stripe：
+                    {tenant.stripe_charges_enabled && tenant.stripe_payouts_enabled
+                      ? "完了"
+                      : "未完了"}
+                  </p>
+                </div>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted">まだ申請がありません。</p>
+      )}
+    </PageShell>
   );
 }

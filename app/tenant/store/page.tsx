@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { StoreForm } from "@/components/tenant/store-form";
+import { TextLink } from "@/components/ui/button";
+import { PageHeader, PageShell } from "@/components/ui/page";
 import { requireTenantUser } from "@/lib/auth/guard";
 import { withPageGuard } from "@/lib/auth/page-guard";
 
@@ -19,18 +20,18 @@ export default async function TenantStorePage() {
     .maybeSingle();
 
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-6 py-12">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">店舗ページ</h1>
-        {store?.slug ? (
-          <Link
-            href={`/stores/${store.slug}`}
-            className="text-sm underline underline-offset-2"
-          >
-            公開ページを見る
-          </Link>
-        ) : null}
-      </header>
+    <PageShell width="form">
+      <PageHeader
+        title="店舗ページ"
+        description="公開ページの URL と紹介文を設定します。"
+        actions={
+          store?.slug ? (
+            <span className="text-sm">
+              <TextLink href={`/stores/${store.slug}`}>公開ページを見る</TextLink>
+            </span>
+          ) : null
+        }
+      />
 
       <StoreForm
         tenantId={membership.tenantId}
@@ -42,9 +43,9 @@ export default async function TenantStorePage() {
         }}
       />
 
-      <Link href="/tenant" className="text-sm underline underline-offset-2">
-        テナント管理へ戻る
-      </Link>
-    </main>
+      <p className="text-sm">
+        <TextLink href="/tenant">テナント管理へ戻る</TextLink>
+      </p>
+    </PageShell>
   );
 }

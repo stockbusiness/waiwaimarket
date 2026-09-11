@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { MfaEnrollment } from "@/components/admin/mfa-enrollment";
+import { TextLink } from "@/components/ui/button";
+import { PageHeader, PageShell } from "@/components/ui/page";
 import { requireHqOperator } from "@/lib/auth/guard";
 import { getMfaStatus } from "@/lib/auth/mfa";
 import { withPageGuard } from "@/lib/auth/page-guard";
@@ -19,20 +20,17 @@ export default async function AdminMfaPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-6 py-12">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">多要素認証</h1>
-        <p className="text-sm leading-6 text-zinc-600">
-          本部管理者の操作（ルール設定、精算確定、手動調整の承認、テナントの停止）には
-          多要素認証が必要です。審査・承認・差戻しは設定前でも行えます。
-        </p>
-      </header>
+    <PageShell width="form">
+      <PageHeader
+        title="多要素認証"
+        description="本部管理者の操作（ルール設定、精算確定、手動調整の承認、テナントの停止）には多要素認証が必要です。審査・承認・差戻しは設定前でも行えます。"
+      />
 
       <MfaEnrollment alreadyVerified={status.hasVerifiedFactor} />
 
-      <Link href="/admin" className="text-sm underline underline-offset-2">
-        本部管理へ戻る
-      </Link>
-    </main>
+      <p className="text-sm">
+        <TextLink href="/admin">本部管理へ戻る</TextLink>
+      </p>
+    </PageShell>
   );
 }
