@@ -26,14 +26,13 @@ const SECTIONS = [
 
 export function SiteFooter() {
   return (
-    // 暗い面では本文の背景（#0b0b0c）とフッターの黒がほぼ同じになり、
-    // 境目が見えなくなる。罫線で区切る。
-    <footer className="mt-auto border-t border-line bg-footer text-on-footer">
+    <footer className="mt-auto bg-footer text-on-footer">
       <div className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
         <div className="grid gap-8 sm:grid-cols-3">
           {SECTIONS.map((section) => (
             <nav key={section.heading} aria-label={section.heading}>
-              <h2 className="text-xs font-medium text-on-footer-muted">
+              {/* 色を落とすとコントラストが AA を切るため、階層は大きさと太さで付ける */}
+              <h2 className="text-xs font-bold tracking-wide opacity-95">
                 {section.heading}
               </h2>
               <ul className="mt-3 flex flex-col gap-2.5 text-sm">
@@ -49,7 +48,7 @@ export function SiteFooter() {
           ))}
         </div>
 
-        <p className="mt-10 text-xs text-on-footer-muted">
+        <p className="mt-10 text-xs leading-5">
           販売者は各テナントです。決済と精算はマーケット運営本部が代行します。
         </p>
       </div>

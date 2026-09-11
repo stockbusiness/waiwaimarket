@@ -32,10 +32,18 @@
   --on-accent: #ffffff;
   --link: #067bbf;
 
-  /* フッター。明暗どちらでも黒地に白文字 */
-  --footer: #000000;
+  /*
+   * フッター。主要操作と同じ青を敷く。
+   *
+   * 文字は白だけにする。この青の上で AA（4.5:1）を満たすのは白のみで、
+   * 薄い水色にすると 3.9:1 まで落ちる（白でも 4.57:1）。見出しの階層は
+   * 色ではなく大きさと太さで付ける。
+   *
+   * 暗い面でも同じ青を使う。暗い面の --accent は明度を上げてあるので、
+   * それをそのまま敷くと画面下に明るい面が大きく出て目に痛い。
+   */
+  --footer: #067bbf;
   --on-footer: #ffffff;
-  --on-footer-muted: #a1a1aa;
 
   /* 状態 */
   --danger: #b91c1c;
@@ -87,7 +95,6 @@
   --color-link: var(--link);
   --color-footer: var(--footer);
   --color-on-footer: var(--on-footer);
-  --color-on-footer-muted: var(--on-footer-muted);
   --color-danger: var(--danger);
   --color-danger-surface: var(--danger-surface);
   --color-success: var(--success);
