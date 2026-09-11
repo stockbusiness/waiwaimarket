@@ -50,7 +50,8 @@ describe("readApiError", () => {
   it("既知の理由をそれぞれの文言にする", async () => {
     const cases: [string, string][] = [
       ["already_belongs_to_tenant", "すでに別のテナント"],
-      ["slug_taken", "店舗 URL"],
+      ["slug_taken", "すでに使われています"],
+      ["conflict", "先に保存しました"],
       ["not_found", "見つかりません"],
       ["invalid_transition", "実行できない操作"],
       ["unauthenticated", "ログイン"],

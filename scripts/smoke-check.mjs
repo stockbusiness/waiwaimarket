@@ -105,6 +105,25 @@ const checks = [
     },
   },
   {
+    name: "存在しないサイトページが 404 を返す",
+    run: async () => {
+      const res = await fetch(`${baseUrl}/legal/no-such-page-xyz`, { redirect: "manual" });
+      return { ok: res.status === 404, detail: `HTTP ${res.status}` };
+    },
+  },
+  {
+    name: "サイトページ API が未認証を 401 で弾く",
+    run: async () => {
+      const res = await fetch(`${baseUrl}/admin/api/pages`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+        redirect: "manual",
+      });
+      return { ok: res.status === 401, detail: `HTTP ${res.status}` };
+    },
+  },
+  {
     name: "未ログインで /admin/mfa はログイン画面へ飛ぶ",
     run: async () => {
       const res = await fetch(`${baseUrl}/admin/mfa`, { redirect: "manual" });

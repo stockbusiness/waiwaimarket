@@ -200,6 +200,57 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      site_pages: {
+        Row: {
+          id: string;
+          slug: string;
+          title: string;
+          sort_order: number;
+          is_published: boolean;
+          published_revision_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          slug: string;
+          title: string;
+          sort_order?: number;
+          is_published?: boolean;
+          published_revision_id?: string | null;
+        };
+        Update: {
+          slug?: string;
+          title?: string;
+          sort_order?: number;
+          is_published?: boolean;
+          published_revision_id?: string | null;
+        };
+        Relationships: [];
+      };
+      site_page_revisions: {
+        Row: {
+          id: string;
+          page_id: string;
+          revision_number: number;
+          body: string;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          page_id: string;
+          revision_number: number;
+          body: string;
+          note?: string | null;
+          created_by?: string | null;
+        };
+        /**
+         * 版は積むだけで書き換えない。規約の改定履歴は「いつ何を出していたか」を
+         * 後から示せる必要があるため、既存の版を直せる型を持たせない。
+         */
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: {

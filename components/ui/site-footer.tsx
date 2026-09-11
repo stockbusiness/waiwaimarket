@@ -1,16 +1,16 @@
 import Link from "next/link";
 
+import { listPublishedPages } from "@/lib/site/pages";
+
 /**
- * 共通フッター。黒地に白文字のリンク一覧。
+ * 共通フッター。主要操作と同じ青地に白文字のリンク一覧。
  *
- * 掲載するのは実在する画面だけにする。規約やポリシーのページはまだ無いので、
- * 用意できてから足す。リンク切れを置くほうが、項目が少ないことより悪い。
+ * 掲載するのは実在する画面だけにする。リンク切れを置くほうが、
+ * 項目が少ないことより悪い。「マーケットについて」の列は本部が
+ * 管理画面で公開したページ（利用規約・プライバシーポリシー・
+ * 特商法表記・会社概要など）を並べる。未公開のものは出ない。
  */
-const SECTIONS = [
-  {
-    heading: "マーケットについて",
-    links: [{ href: "/", label: "トップ" }],
-  },
+const FIXED_SECTIONS = [
   {
     heading: "出店をお考えの方",
     links: [
@@ -24,12 +24,25 @@ const SECTIONS = [
   },
 ];
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const pages = await listPublishedPages();
+
+  const sections = [
+    {
+      heading: "マーケットについて",
+      links: [
+        { href: "/", label: "トップ" },
+        ...pages.map((page) => ({ href: `/legal/${page.slug}`, label: page.title })),
+      ],
+    },
+    ...FIXED_SECTIONS,
+  ];
+
   return (
     <footer className="mt-auto bg-footer text-on-footer">
       <div className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
         <div className="grid gap-8 sm:grid-cols-3">
-          {SECTIONS.map((section) => (
+          {sections.map((section) => (
             <nav key={section.heading} aria-label={section.heading}>
               {/* 色を落とすとコントラストが AA を切るため、階層は大きさと太さで付ける */}
               <h2 className="text-xs font-bold tracking-wide opacity-95">

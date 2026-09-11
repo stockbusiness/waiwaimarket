@@ -29,8 +29,12 @@ export async function readApiError(
       return "入力内容に誤りがあります。各項目をご確認ください。";
     case "already_belongs_to_tenant":
       return "すでに別のテナントに所属しています。";
+    // 店舗ページとサイト共通ページの両方で使うため、対象を限定しない文言にする
     case "slug_taken":
-      return "その店舗 URL はすでに使われています。";
+      return "その URL はすでに使われています。別の値を入力してください。";
+    // 同じ対象を同時に保存したときの衝突。片方の変更を消さずにやり直させる
+    case "conflict":
+      return "ほかの担当者が先に保存しました。画面を再読み込みしてやり直してください。";
     case "not_found":
       return "対象が見つかりませんでした。";
     case "invalid_transition":

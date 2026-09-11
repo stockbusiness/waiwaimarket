@@ -233,9 +233,116 @@ select '本部は全テナントを読める', '3', current_setting('verify.v'),
        case when current_setting('verify.v') = '3' then 'PASS' else 'FAIL' end;
 
 -- ------------------------------------------------------------
+-- 6. サイト共通ページは公開中のものだけが外に出る（0009）
+--
+-- 下書きの規約が公開ページとして読めてしまうと、確定前の文面が
+-- 外に出る。版（本文）も同じで、公開中の版だけが読める。
+-- ------------------------------------------------------------
+insert into site_pages (id, slug, title, sort_order) values
+  ('dddddddd-dddd-dddd-dddd-ddddddddddd1', 'verify-published', '検証・公開ページ', 900),
+  ('dddddddd-dddd-dddd-dddd-ddddddddddd2', 'verify-draft', '検証・下書きページ', 901);
+
+insert into site_page_revisions (id, page_id, revision_number, body) values
+  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee1',
+   'dddddddd-dddd-dddd-dddd-ddddddddddd1', 1, '公開中の本文'),
+  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee2',
+   'dddddddd-dddd-dddd-dddd-ddddddddddd1', 2, '公開していない新しい版'),
+  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee3',
+   'dddddddd-dddd-dddd-dddd-ddddddddddd2', 1, '下書きの本文');
+
+update site_pages
+   set published_revision_id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee1',
+       is_published = true
+ where id = 'dddddddd-dddd-dddd-dddd-ddddddddddd1';
+
+set role anon;
+set request.jwt.claim.sub = '';
+set request.jwt.claims = '{"role":"anon"}';
+
+select set_config('verify.v',
+  (select count(*)::text from site_pages where slug = 'verify-published'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は公開中のサイトページを読める', '1', current_setting('verify.v'),
+       case when current_setting('verify.v') = '1' then 'PASS' else 'FAIL' end;
+
+set role anon;
+select set_config('verify.v',
+  (select count(*)::text from site_pages where slug = 'verify-draft'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は下書きのサイトページを読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+set role anon;
+select set_config('verify.v',
+  (select count(*)::text from site_page_revisions
+   where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee1'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は公開中の版の本文を読める', '1', current_setting('verify.v'),
+       case when current_setting('verify.v') = '1' then 'PASS' else 'FAIL' end;
+
+-- 公開ページであっても、公開していない版は外に出さない
+set role anon;
+select set_config('verify.v',
+  (select count(*)::text from site_page_revisions
+   where id in ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee2',
+                'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee3')), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は公開していない版の本文を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- テナント利用者も本部ではないので下書きは見えない
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+select set_config('verify.v',
+  (select count(*)::text from site_pages where slug = 'verify-draft'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select 'テナント利用者は下書きのサイトページを読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 書き換えは本部管理者だけ。匿名が書き換えられたら公開文書が改ざんできる
+set role anon;
+set request.jwt.claim.sub = '';
+set request.jwt.claims = '{"role":"anon"}';
+do $$
+begin
+  update site_pages set title = '改ざん' where slug = 'verify-published';
+  perform set_config('verify.v',
+    (select count(*)::text from site_pages where title = '改ざん'), false);
+exception when insufficient_privilege then
+  perform set_config('verify.v', '0', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名はサイトページを書き換えられない', '0',
+       (select count(*)::text from site_pages where title = '改ざん'),
+       case when (select count(*) from site_pages where title = '改ざん') = 0
+            then 'PASS' else 'FAIL' end;
+
+-- 本部は下書きも読める（編集に必要）
+set role authenticated;
+set request.jwt.claim.sub = '99999999-9999-9999-9999-999999999991';
+set request.jwt.claims = '{"sub":"99999999-9999-9999-9999-999999999991","role":"authenticated"}';
+select set_config('verify.v',
+  (select count(*)::text from site_pages
+   where slug in ('verify-published', 'verify-draft')), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '本部は下書きを含めてサイトページを読める', '2', current_setting('verify.v'),
+       case when current_setting('verify.v') = '2' then 'PASS' else 'FAIL' end;
+
+-- ------------------------------------------------------------
 -- 後片付け
 -- ------------------------------------------------------------
 reset role;
+update site_pages set is_published = false, published_revision_id = null
+ where slug in ('verify-published', 'verify-draft');
+delete from site_pages where slug in ('verify-published', 'verify-draft');
 delete from audit_logs where action in ('verify.probe', '改ざん');
 delete from hq_members where user_id = '99999999-9999-9999-9999-999999999991';
 delete from tenants where id in ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1',

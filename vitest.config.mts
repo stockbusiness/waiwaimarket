@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    // tsx も拾う。描画まで通して確かめるテスト（Markdown）がある
+    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
   },
   resolve: {
     alias: {
