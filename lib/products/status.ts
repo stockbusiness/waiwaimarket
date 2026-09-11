@@ -81,6 +81,17 @@ export function reviewRequiresHqAdmin(action: ProductReviewAction): boolean {
 }
 
 /**
+ * 差戻しと販売停止は理由が要る。
+ *
+ * 理由を書かずに差し戻すと、テナントは何を直せばよいか分からないまま
+ * 出し直すことになり、審査が何度も往復する。承認と再開は任意
+ * （補足があれば残す）。
+ */
+export function reviewRequiresNote(action: ProductReviewAction): boolean {
+  return action === "reject" || action === "suspend";
+}
+
+/**
  * 本文（表題・説明・カテゴリー・画像）を直したら審査をやり直す。
  *
  * 公開中の商品の本文を自由に書き換えられると、きれいな内容で承認を取って

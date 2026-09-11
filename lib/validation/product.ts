@@ -72,6 +72,24 @@ export const productImagesSchema = z
   )
   .max(10);
 
+/**
+ * 本部の商品審査（docs/06 フェーズ2-2）。
+ *
+ * 理由の必須は `lib/products/review.ts` の `requiresNote()` で見る。
+ * ここで action ごとに分けると、画面と API で判定が二重になる。
+ */
+export const productReviewSchema = z.object({
+  action: z.enum(["approve", "reject", "suspend", "reinstate"]),
+  note: z
+    .string()
+    .trim()
+    .max(1000)
+    .optional()
+    .transform((value) => (value ? value : undefined)),
+});
+
+export type ProductReviewInput = z.infer<typeof productReviewSchema>;
+
 /** 本部のカテゴリー管理（docs/00 5.3「カテゴリー・特集管理」） */
 export const categorySchema = z.object({
   name: z.string().trim().min(1).max(60),
