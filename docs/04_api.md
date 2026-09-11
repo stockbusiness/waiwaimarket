@@ -104,6 +104,23 @@ cookie を使わない経路はこの規約の対象外とする。
   停止と復帰を本部管理者に限るのは docs/00 5.4 の権限表による
   （オペレーターはルール変更・精算確定・手動調整が不可）。
 
+• POST /admin/api/products/{id}/review
+
+  `action` で状態遷移を指定する。
+
+  | action | 遷移 | 権限 |
+  |---|---|---|
+  | `approve` | submitted → approved | 本部オペレーター以上 |
+  | `reject` | submitted → rejected | 本部オペレーター以上 |
+  | `suspend` | approved → suspended | 本部管理者のみ |
+  | `reinstate` | suspended → approved | 本部管理者のみ |
+
+  `reject` と `suspend` は `note`（理由）が必須。テナントの商品画面に
+  そのまま表示され、監査ログにも残る。`reinstate` は理由を消す。
+
+  読んだときの状態と書くときの状態が同じ場合だけ更新する。2 人の担当者が
+  同時に開いていても、片方の判断が黙って消えない。
+
 • POST /admin/api/categories、PUT /admin/api/categories/{id}
 
   商品カテゴリーの追加・更新（docs/00 5.3）。本部管理者のみ。削除は用意しない。

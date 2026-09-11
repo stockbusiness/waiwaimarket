@@ -255,16 +255,22 @@ export type Database = {
           status?: ProductStatus;
         };
         /**
-         * 審査列（reviewed_by / reviewed_at / review_note）はここに出さない。
-         * 0010 の products_guard_review_columns() がテナントからの変更を
-         * 例外で拒否するため、型でも触れないようにしておく。
-         * 本部の審査は lib/products/review.ts が service_role で書く。
+         * 審査列（reviewed_by / reviewed_at / review_note）も書ける形にしてある。
+         * 本部の審査（lib/products/review.ts）が本部のセッションで書くため。
+         *
+         * テナントからの変更を止めているのは型ではなく
+         * 0010 の products_guard_review_columns()。呼び出し元が
+         * 本部オペレーター以上かサーバー処理でなければ例外になる。
+         * 型はどちらの経路も同じなので、ここでの制限は防御にならない。
          */
         Update: {
           title?: string;
           description?: string | null;
           category_id?: string | null;
           status?: ProductStatus;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          review_note?: string | null;
         };
         Relationships: [];
       };

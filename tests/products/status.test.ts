@@ -11,6 +11,7 @@ import {
   nextReviewStatus,
   nextTenantStatus,
   reviewRequiresHqAdmin,
+  reviewRequiresNote,
   submitBlockers,
 } from "@/lib/products/status";
 import type { ProductStatus } from "@/lib/supabase/database.types";
@@ -79,6 +80,14 @@ describe("本部側の遷移", () => {
     for (const action of PRODUCT_REVIEW_ACTIONS) {
       expect(ALL_STATUSES).toContain(nextReviewStatus(action));
     }
+  });
+
+  it("差戻しと販売停止には理由が要る", () => {
+    // 理由を書かずに差し戻すと、テナントは何を直せばよいか分からない
+    expect(reviewRequiresNote("reject")).toBe(true);
+    expect(reviewRequiresNote("suspend")).toBe(true);
+    expect(reviewRequiresNote("approve")).toBe(false);
+    expect(reviewRequiresNote("reinstate")).toBe(false);
   });
 });
 

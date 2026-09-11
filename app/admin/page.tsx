@@ -31,6 +31,7 @@ export default async function AdminHome() {
 
       <nav aria-label="本部メニュー" className="flex flex-col gap-3 text-sm">
         <TextLink href="/admin/tenants">テナント審査</TextLink>
+        <TextLink href="/admin/products">商品審査</TextLink>
         <TextLink href="/admin/categories">商品カテゴリー</TextLink>
         <TextLink href="/admin/pages">サイトページ（規約・特商法表記など）</TextLink>
       </nav>
