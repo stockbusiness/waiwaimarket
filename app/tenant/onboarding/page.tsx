@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 
 import { StripeOnboardingButton } from "@/components/tenant/stripe-onboarding-button";
 import { Alert } from "@/components/ui/alert";
-import { TextLink } from "@/components/ui/button";
-import { Card, PageHeader, PageShell } from "@/components/ui/page";
+import { Breadcrumb, Card, PageHeader, PageShell } from "@/components/ui/page";
 import { requireTenantUser } from "@/lib/auth/guard";
 import { withPageGuard } from "@/lib/auth/page-guard";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -60,6 +59,12 @@ export default async function TenantOnboardingPage() {
 
   return (
     <PageShell width="form">
+      <Breadcrumb
+        items={[
+          { href: "/tenant", label: "テナント管理" },
+          { href: "/tenant/onboarding", label: "Stripe の手続き" },
+        ]}
+      />
       <PageHeader title="Stripe の手続き" description={tenant.name} />
 
       <Card>
@@ -92,9 +97,6 @@ export default async function TenantOnboardingPage() {
         />
       )}
 
-      <p className="text-sm">
-        <TextLink href="/tenant">テナント管理へ戻る</TextLink>
-      </p>
     </PageShell>
   );
 }

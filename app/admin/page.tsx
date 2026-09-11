@@ -1,4 +1,3 @@
-import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Alert } from "@/components/ui/alert";
 import { TextLink } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/ui/page";
@@ -19,7 +18,6 @@ export default async function AdminHome() {
         description={`${context.user.email}（${
           context.role === "hq_admin" ? "本部管理者" : "本部オペレーター"
         }）`}
-        actions={<SignOutButton audience="hq" />}
       />
 
       {needsMfa ? (
