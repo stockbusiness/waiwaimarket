@@ -45,7 +45,11 @@ cookie を使わない経路はこの規約の対象外とする。
 　必要になった時点で作る。公開判定はいずれの経路でも RLS が持つ
 　（`products_public_read` が承認済み商品かつ承認済みテナントに限る）。
 
-• POST /api/market/cart/items
+• POST /api/market/cart/items（SKU と数量だけを受け取る。金額もテナントIDも渡させない）
+
+• PATCH /api/market/cart/items/{itemId}（数量変更）
+
+• DELETE /api/market/cart/items/{itemId}
 
 • POST /api/market/checkout/preview（在庫引当・ポイント予約を開始）
 
@@ -68,6 +72,13 @@ cookie を使わない経路はこの規約の対象外とする。
 • PUT /tenant/api/store（店舗情報。1テナント1件なので upsert）
 
 • PUT /tenant/api/legal-profile（特定商取引法に基づく表記。同上）
+
+• PUT /tenant/api/shipping（送料・発送日数。1テナント1件なので upsert）
+
+  `regionRules` で地域別送料を保存する（docs/03 の形）。送られてこなければ
+  地域別なしとして保存する。既存のルールを残さないのは、画面から全部消したのか
+  項目ごと送られていないのかを区別できないため（SKU の一括保存と同じ）。
+  形はアプリ（`lib/shipping/region.ts`）と 0012 の検査制約の両方が見る。
 
 • POST /tenant/api/products（本体のみ。画像は `<tenant_id>/<product_id>/...` に置くため、商品IDが決まってから登録する）
 

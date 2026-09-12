@@ -9,6 +9,14 @@
  */
 
 export type HqRole = "hq_admin" | "hq_operator";
+export type OrderStatus =
+  | "pending"
+  | "paid"
+  | "shipped"
+  | "completed"
+  | "cancelled"
+  | "refunded"
+  | "partially_refunded";
 export type ProductStatus =
   | "draft"
   | "submitted"
@@ -336,6 +344,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      carts: {
+        Row: {
+          id: string;
+          buyer_id: string;
+          tenant_id: string;
+          created_at: string;
+        };
+        Insert: {
+          buyer_id: string;
+          tenant_id: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      cart_items: {
+        Row: {
+          id: string;
+          cart_id: string;
+          variant_id: string;
+          quantity: number;
+        };
+        Insert: {
+          cart_id: string;
+          variant_id: string;
+          quantity: number;
+        };
+        Update: {
+          quantity?: number;
+        };
+        Relationships: [];
+      };
+      shipping_profiles: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          name: string;
+          base_fee: number;
+          free_threshold: number | null;
+          lead_time_days: number;
+          region_rules: Json;
+        };
+        Insert: {
+          tenant_id: string;
+          name: string;
+          base_fee?: number;
+          free_threshold?: number | null;
+          lead_time_days?: number;
+          // 形は 0012 の検査制約（shipping_profiles_region_rules_shape）が守る。
+          // 型では Json までしか言えない
+          region_rules?: Json;
+        };
+        Update: {
+          name?: string;
+          base_fee?: number;
+          free_threshold?: number | null;
+          lead_time_days?: number;
+          region_rules?: Json;
+        };
+        Relationships: [];
+      };
       site_pages: {
         Row: {
           id: string;
@@ -421,6 +489,7 @@ export type Database = {
       hq_role: HqRole;
       tenant_status: TenantStatus;
       product_status: ProductStatus;
+      order_status: OrderStatus;
     };
     CompositeTypes: Record<never, never>;
   };

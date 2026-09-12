@@ -615,9 +615,168 @@ select '匿名は引当の明細を読めない', '0', current_setting('verify.v
        case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
 
 -- ------------------------------------------------------------
+-- 10. カートは本人だけのもの（0004 carts_self_all / cart_items_self_all）
+--
+-- 他人のカートが読めると、何を買おうとしているかが漏れる。
+-- 書ければ、他人のカートに商品を入れられる。
+-- ------------------------------------------------------------
+insert into carts (id, buyer_id, tenant_id) values
+  ('c0000000-0000-4000-8000-00000000000a', '11111111-1111-1111-1111-111111111111',
+   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1');
+insert into cart_items (id, cart_id, variant_id, quantity) values
+  ('c1000000-0000-4000-8000-00000000000a', 'c0000000-0000-4000-8000-00000000000a',
+   'f1000000-0000-4000-8000-000000000001', 1);
+
+insert into shipping_profiles (id, tenant_id, name, base_fee, free_threshold) values
+  ('50000000-0000-4000-8000-00000000000a', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1',
+   '検証・標準', 800, 5000);
+
+-- 本人は読める（ポリシーが厳しすぎないことの確認）
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+select set_config('verify.v',
+  (select count(*)::text from carts where id = 'c0000000-0000-4000-8000-00000000000a'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '購入者は自分のカートを読める', '1', current_setting('verify.v'),
+       case when current_setting('verify.v') = '1' then 'PASS' else 'FAIL' end;
+
+-- 別の利用者からは見えない
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222221';
+set request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222221","role":"authenticated"}';
+select set_config('verify.v',
+  (select count(*)::text from carts where id = 'c0000000-0000-4000-8000-00000000000a'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '他人のカートを読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+set role authenticated;
+select set_config('verify.v',
+  (select count(*)::text from cart_items
+   where cart_id = 'c0000000-0000-4000-8000-00000000000a'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '他人のカートの中身を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 他人のカートに商品を入れられない
+set role authenticated;
+do $$
+begin
+  insert into cart_items (cart_id, variant_id, quantity)
+  values ('c0000000-0000-4000-8000-00000000000a',
+          'f1000000-0000-4000-8000-000000000002', 1);
+  perform set_config('verify.v', '1', false);
+exception when others then
+  perform set_config('verify.v', '0', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '他人のカートに商品を入れられない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 匿名はカートを一切読めない
+set role anon;
+set request.jwt.claim.sub = '';
+set request.jwt.claims = '{"role":"anon"}';
+select set_config('verify.v', (select count(*)::text from carts), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名はカートを読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 送料は購入前に確認する必要があるので、承認済みテナントの分は公開
+set role anon;
+select set_config('verify.v',
+  (select count(*)::text from shipping_profiles
+   where tenant_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は承認済みテナントの送料を読める', '1', current_setting('verify.v'),
+       case when current_setting('verify.v') = '1' then 'PASS' else 'FAIL' end;
+
+-- ------------------------------------------------------------
+-- 地域別送料（0012）
+-- ------------------------------------------------------------
+-- 検査制約の式は書き込みを行うロールの権限で評価される。0011 のつもりで
+-- EXECUTE を剥がすと、テナント自身の送料保存が permission denied で落ちる。
+-- 「剥がしていないこと」を固定しておく（剥がしたら FAIL に転ずる）。
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '検査関数の EXECUTE を anon から剥がしていない', 'true',
+       has_function_privilege('anon', 'is_valid_region_rules(jsonb)', 'execute')::text,
+       case when has_function_privilege('anon', 'is_valid_region_rules(jsonb)', 'execute')
+            then 'PASS' else 'FAIL' end;
+
+insert into _perm_results (item, expected, actual, verdict)
+select '検査関数の EXECUTE を authenticated から剥がしていない', 'true',
+       has_function_privilege('authenticated', 'is_valid_region_rules(jsonb)', 'execute')::text,
+       case when has_function_privilege('authenticated', 'is_valid_region_rules(jsonb)', 'execute')
+            then 'PASS' else 'FAIL' end;
+
+-- 検査制約そのものが付いていること。落とすと形の壊れた jsonb が入り、
+-- 送料が静かに基本送料へ落ちる
+insert into _perm_results (item, expected, actual, verdict)
+select 'region_rules の検査制約がある', '1',
+       (select count(*)::text from pg_constraint
+         where conname = 'shipping_profiles_region_rules_shape'),
+       case when (select count(*) from pg_constraint
+                   where conname = 'shipping_profiles_region_rules_shape') = 1
+            then 'PASS' else 'FAIL' end;
+
+-- 壊れた形を実際に弾くか。制約が「付いているが素通り」を検出する
+do $$
+begin
+  perform set_config('verify.v', '拒否', false);
+  update shipping_profiles
+     set region_rules = '{"version":1,"rules":[{"prefectures":["48"],"fee":900}]}'::jsonb
+   where id = '50000000-0000-4000-8000-00000000000a';
+  perform set_config('verify.v', '通過', false);
+exception when check_violation then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+insert into _perm_results (item, expected, actual, verdict)
+select '知らない都道府県コードを DB が拒否する', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+do $$
+begin
+  perform set_config('verify.v', '拒否', false);
+  update shipping_profiles
+     set region_rules = '{"version":1,"rules":[{"prefectures":["47"],"fee":900},
+                                               {"prefectures":["47"],"fee":1}]}'::jsonb
+   where id = '50000000-0000-4000-8000-00000000000a';
+  perform set_config('verify.v', '通過', false);
+exception when check_violation then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+insert into _perm_results (item, expected, actual, verdict)
+select '同じ都道府県の重複を DB が拒否する', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+-- 弾きすぎていないことも見る。正しい形が入らなければ設定できない
+do $$
+begin
+  update shipping_profiles
+     set region_rules = '{"version":1,"rules":[{"prefectures":["46","47"],"fee":1500}]}'::jsonb
+   where id = '50000000-0000-4000-8000-00000000000a';
+  perform set_config('verify.v', '通過', false);
+exception when others then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+insert into _perm_results (item, expected, actual, verdict)
+select '正しい地域別送料は保存できる', '通過', current_setting('verify.v'),
+       case when current_setting('verify.v') = '通過' then 'PASS' else 'FAIL' end;
+
+-- ------------------------------------------------------------
 -- 後片付け
 -- ------------------------------------------------------------
 reset role;
+delete from carts where id = 'c0000000-0000-4000-8000-00000000000a';
+delete from shipping_profiles where id = '50000000-0000-4000-8000-00000000000a';
 delete from product_categories where slug = 'verify-category';
 delete from products where id in ('f0000000-0000-4000-8000-000000000001',
                                   'f0000000-0000-4000-8000-000000000002',
