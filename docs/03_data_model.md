@@ -30,9 +30,9 @@
 
 • inventory_reservations：購入手続き中の引当（有効期限付き。TTL 15分）。RLS 有効・ポリシーなしで、引当と解放は 0011 の関数を service_role から呼ぶ経路のみ
 
-• shipping_profiles：送料・配送地域・発送日数
+• carts / cart_items：カート。購入者ごと・テナントごとに1つ（0003 の一意索引）。カート投入時には在庫を引き当てない
 
-• carts / cart_items：カート
+• shipping_profiles：送料・配送地域・発送日数。region_rules（地域別）は構造未定義のため未使用。基本送料と送料無料しきい値のみ使う
 
 • orders：注文親情報
 

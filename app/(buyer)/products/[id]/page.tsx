@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { AddToCart } from "@/components/buyer/add-to-cart";
 import { Badge } from "@/components/ui/alert";
 import { TextLink } from "@/components/ui/button";
 import { Breadcrumb, PageHeader, PageShell, SectionHeader } from "@/components/ui/page";
 import { formatPriceRange, formatYen } from "@/lib/products/price";
 import { getPublicProduct } from "@/lib/products/public";
+import { getAudienceSession } from "@/lib/auth/session";
 
 /**
  * 公開の商品詳細（docs/00 5.1、docs/06 4.1）。
@@ -13,7 +15,7 @@ import { getPublicProduct } from "@/lib/products/public";
  * 公開されていない商品は RLS で読めないため、そのまま 404 になる。
  * 「審査中です」とは出さない。未公開の商品の存在を外に知らせないため。
  *
- * カートへの導線はまだ置かない（フェーズ3）。
+ * カートへは入れられるが、購入手続き（決済）はまだ繋がっていない。
  */
 
 export async function generateMetadata({
@@ -39,6 +41,11 @@ export default async function ProductDetailPage({
   const { id } = await params;
   const product = await getPublicProduct(id);
   if (!product) notFound();
+
+  // 購入にはマーケット専用の会員登録が要る（docs/06 4.1）。
+  // 未ログインでも商品は見せ、押した時点でログインへ送る
+  const { user } = await getAudienceSession("buyer");
+  const loggedIn = user !== null;
 
   return (
     <PageShell>
@@ -101,6 +108,19 @@ export default async function ProductDetailPage({
           <p className="text-sm leading-7 whitespace-pre-wrap">{product.description}</p>
         </section>
       ) : null}
+
+      <section className="flex flex-col gap-3">
+        <SectionHeader title="購入手続き" />
+        <AddToCart
+          loggedIn={loggedIn}
+          variants={product.variants.map((variant) => ({
+            id: variant.id,
+            label: variant.optionLabel ?? variant.sku,
+            priceInclTax: variant.priceInclTax,
+            inStock: variant.inStock,
+          }))}
+        />
+      </section>
 
       <section className="flex flex-col gap-3">
         <SectionHeader title="種類と価格" />

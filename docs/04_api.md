@@ -45,7 +45,11 @@ cookie を使わない経路はこの規約の対象外とする。
 　必要になった時点で作る。公開判定はいずれの経路でも RLS が持つ
 　（`products_public_read` が承認済み商品かつ承認済みテナントに限る）。
 
-• POST /api/market/cart/items
+• POST /api/market/cart/items（SKU と数量だけを受け取る。金額もテナントIDも渡させない）
+
+• PATCH /api/market/cart/items/{itemId}（数量変更）
+
+• DELETE /api/market/cart/items/{itemId}
 
 • POST /api/market/checkout/preview（在庫引当・ポイント予約を開始）
 
@@ -68,6 +72,8 @@ cookie を使わない経路はこの規約の対象外とする。
 • PUT /tenant/api/store（店舗情報。1テナント1件なので upsert）
 
 • PUT /tenant/api/legal-profile（特定商取引法に基づく表記。同上）
+
+• PUT /tenant/api/shipping（送料・発送日数。1テナント1件なので upsert。地域別送料は未対応）
 
 • POST /tenant/api/products（本体のみ。画像は `<tenant_id>/<product_id>/...` に置くため、商品IDが決まってから登録する）
 

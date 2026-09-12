@@ -37,12 +37,20 @@ export function BuyerHeader() {
     <Bar>
       <div className="flex h-14 items-center justify-between gap-4">
         <Logo href="/" />
-        <Link
-          href="/login"
-          className="rounded-sm text-sm font-medium text-muted hover:text-body"
-        >
-          ログイン
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/cart"
+            className="rounded-sm text-sm font-medium text-muted hover:text-body"
+          >
+            カート
+          </Link>
+          <Link
+            href="/login"
+            className="rounded-sm text-sm font-medium text-muted hover:text-body"
+          >
+            ログイン
+          </Link>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-3 pb-3">
         <ButtonLink href="/products" className="w-full">
