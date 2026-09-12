@@ -9,6 +9,7 @@ import {
 } from "@/lib/orders/money";
 import { availableQuantity } from "@/lib/products/price";
 import { productImageUrl } from "@/lib/products/public";
+import { EMPTY_REGION_RULES, parseRegionRules } from "@/lib/shipping/region";
 import type { MarketSupabaseClient } from "@/lib/supabase/server";
 
 import { MAX_ITEM_QUANTITY } from "./limits";
@@ -63,7 +64,12 @@ export type CartView = {
 };
 
 /** 送料の既定。テナントが未設定なら送料無料・3 日で見積もる */
-const DEFAULT_SHIPPING = { baseFee: 0, freeThreshold: null, leadTimeDays: 3 };
+const DEFAULT_SHIPPING = {
+  baseFee: 0,
+  freeThreshold: null,
+  regionRules: EMPTY_REGION_RULES,
+  leadTimeDays: 3,
+};
 
 function toTaxRate(value: number): TaxRate {
   return Number(value) === 0.08 ? 0.08 : 0.1;
@@ -161,9 +167,15 @@ export async function listCarts(
       storeSlug: store?.slug ?? null,
       storeName: store?.displayName ?? null,
       lines,
+      // 届け先の都道府県はカートの時点では分からない。送料は下限になり、
+      // amounts.shippingVaries が真なら画面に「〜円から」と出す
       amounts: calculateOrderAmounts({
         lines: moneyLines,
-        shipping: { baseFee: shipping.baseFee, freeThreshold: shipping.freeThreshold },
+        shipping: {
+          baseFee: shipping.baseFee,
+          freeThreshold: shipping.freeThreshold,
+          regionRules: shipping.regionRules,
+        },
       }),
       shipping,
       blockers,
@@ -268,7 +280,7 @@ async function loadShipping(
 
   const { data, error } = await client
     .from("shipping_profiles")
-    .select("tenant_id, base_fee, free_threshold, lead_time_days")
+    .select("tenant_id, base_fee, free_threshold, lead_time_days, region_rules")
     .in("tenant_id", tenantIds);
 
   if (error) throw error;
@@ -278,6 +290,7 @@ async function loadShipping(
     map.set(row.tenant_id, {
       baseFee: row.base_fee,
       freeThreshold: row.free_threshold,
+      regionRules: parseRegionRules(row.region_rules),
       leadTimeDays: row.lead_time_days,
     });
   }

@@ -699,6 +699,79 @@ select '匿名は承認済みテナントの送料を読める', '1', current_se
        case when current_setting('verify.v') = '1' then 'PASS' else 'FAIL' end;
 
 -- ------------------------------------------------------------
+-- 地域別送料（0012）
+-- ------------------------------------------------------------
+-- 検査制約の式は書き込みを行うロールの権限で評価される。0011 のつもりで
+-- EXECUTE を剥がすと、テナント自身の送料保存が permission denied で落ちる。
+-- 「剥がしていないこと」を固定しておく（剥がしたら FAIL に転ずる）。
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '検査関数の EXECUTE を anon から剥がしていない', 'true',
+       has_function_privilege('anon', 'is_valid_region_rules(jsonb)', 'execute')::text,
+       case when has_function_privilege('anon', 'is_valid_region_rules(jsonb)', 'execute')
+            then 'PASS' else 'FAIL' end;
+
+insert into _perm_results (item, expected, actual, verdict)
+select '検査関数の EXECUTE を authenticated から剥がしていない', 'true',
+       has_function_privilege('authenticated', 'is_valid_region_rules(jsonb)', 'execute')::text,
+       case when has_function_privilege('authenticated', 'is_valid_region_rules(jsonb)', 'execute')
+            then 'PASS' else 'FAIL' end;
+
+-- 検査制約そのものが付いていること。落とすと形の壊れた jsonb が入り、
+-- 送料が静かに基本送料へ落ちる
+insert into _perm_results (item, expected, actual, verdict)
+select 'region_rules の検査制約がある', '1',
+       (select count(*)::text from pg_constraint
+         where conname = 'shipping_profiles_region_rules_shape'),
+       case when (select count(*) from pg_constraint
+                   where conname = 'shipping_profiles_region_rules_shape') = 1
+            then 'PASS' else 'FAIL' end;
+
+-- 壊れた形を実際に弾くか。制約が「付いているが素通り」を検出する
+do $$
+begin
+  perform set_config('verify.v', '拒否', false);
+  update shipping_profiles
+     set region_rules = '{"version":1,"rules":[{"prefectures":["48"],"fee":900}]}'::jsonb
+   where id = '50000000-0000-4000-8000-00000000000a';
+  perform set_config('verify.v', '通過', false);
+exception when check_violation then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+insert into _perm_results (item, expected, actual, verdict)
+select '知らない都道府県コードを DB が拒否する', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+do $$
+begin
+  perform set_config('verify.v', '拒否', false);
+  update shipping_profiles
+     set region_rules = '{"version":1,"rules":[{"prefectures":["47"],"fee":900},
+                                               {"prefectures":["47"],"fee":1}]}'::jsonb
+   where id = '50000000-0000-4000-8000-00000000000a';
+  perform set_config('verify.v', '通過', false);
+exception when check_violation then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+insert into _perm_results (item, expected, actual, verdict)
+select '同じ都道府県の重複を DB が拒否する', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+-- 弾きすぎていないことも見る。正しい形が入らなければ設定できない
+do $$
+begin
+  update shipping_profiles
+     set region_rules = '{"version":1,"rules":[{"prefectures":["46","47"],"fee":1500}]}'::jsonb
+   where id = '50000000-0000-4000-8000-00000000000a';
+  perform set_config('verify.v', '通過', false);
+exception when others then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+insert into _perm_results (item, expected, actual, verdict)
+select '正しい地域別送料は保存できる', '通過', current_setting('verify.v'),
+       case when current_setting('verify.v') = '通過' then 'PASS' else 'FAIL' end;
+
+-- ------------------------------------------------------------
 -- 後片付け
 -- ------------------------------------------------------------
 reset role;

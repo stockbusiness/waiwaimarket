@@ -57,7 +57,7 @@
    npx supabase db push
    ```
 
-   `0001_init.sql` から `0011_inventory_reservations.sql` までが順に流れる。
+   `0001_init.sql` から `0012_shipping_region_rules.sql` までが順に流れる。
    `0003` の check 制約と `0006` の外部キーは既存行を検証するので、
    **空のプロジェクトに適用すること。**
 
@@ -73,6 +73,16 @@
    「商品カテゴリーを確定する」が未了のため。テナントは商品を審査に出すとき
    カテゴリーの選択が必要なので、出品を始める前に本部が `/admin/categories`
    から登録すること。
+
+   `0012` は `shipping_profiles.region_rules` の既定値を
+   `{"version": 1, "rules": []}` に変え、それに合わない既存行（0001 の既定値
+   `{}`）を同じ値へ書き換えてから検査制約を付ける。テナントが入力した
+   地域別送料は 0012 より前には存在しないので、失われるものはない。
+
+   `0012` が作る `is_valid_region_rules()` の実行権限は**剥がさないこと。**
+   検査制約の式は書き込みを行うロールの権限で評価されるため、0011 の関数と
+   同じつもりで anon / authenticated から剥がすと、テナントの送料保存が
+   `permission denied for function` で落ちる。
 
    `0008` の Storage ポリシーは `storage.objects` の所有者の都合で SQL Editor から
    作れない可能性を懸念していたが、実プロジェクトでは問題なく作成できた。

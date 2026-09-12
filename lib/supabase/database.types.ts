@@ -391,12 +391,16 @@ export type Database = {
           base_fee?: number;
           free_threshold?: number | null;
           lead_time_days?: number;
+          // 形は 0012 の検査制約（shipping_profiles_region_rules_shape）が守る。
+          // 型では Json までしか言えない
+          region_rules?: Json;
         };
         Update: {
           name?: string;
           base_fee?: number;
           free_threshold?: number | null;
           lead_time_days?: number;
+          region_rules?: Json;
         };
         Relationships: [];
       };

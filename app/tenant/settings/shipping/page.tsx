@@ -4,6 +4,7 @@ import { ShippingForm } from "@/components/tenant/shipping-form";
 import { Breadcrumb, PageHeader, PageShell } from "@/components/ui/page";
 import { requireTenantUser } from "@/lib/auth/guard";
 import { withPageGuard } from "@/lib/auth/page-guard";
+import { parseRegionRules } from "@/lib/shipping/region";
 
 export const metadata = { title: "送料設定" };
 
@@ -14,9 +15,14 @@ export default async function TenantShippingPage() {
 
   const { data: profile } = await context.client
     .from("shipping_profiles")
-    .select("name, base_fee, free_threshold, lead_time_days")
+    .select("name, base_fee, free_threshold, lead_time_days, region_rules")
     .eq("tenant_id", membership.tenantId)
     .maybeSingle();
+
+  const regionRules = parseRegionRules(profile?.region_rules).rules.map((rule) => ({
+    prefectures: rule.prefectures,
+    fee: String(rule.fee),
+  }));
 
   return (
     <PageShell width="form">
@@ -38,6 +44,7 @@ export default async function TenantShippingPage() {
           baseFee: String(profile?.base_fee ?? 0),
           freeThreshold: profile?.free_threshold == null ? "" : String(profile.free_threshold),
           leadTimeDays: String(profile?.lead_time_days ?? 3),
+          regionRules,
         }}
       />
     </PageShell>

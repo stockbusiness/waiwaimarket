@@ -73,7 +73,12 @@ cookie を使わない経路はこの規約の対象外とする。
 
 • PUT /tenant/api/legal-profile（特定商取引法に基づく表記。同上）
 
-• PUT /tenant/api/shipping（送料・発送日数。1テナント1件なので upsert。地域別送料は未対応）
+• PUT /tenant/api/shipping（送料・発送日数。1テナント1件なので upsert）
+
+  `regionRules` で地域別送料を保存する（docs/03 の形）。送られてこなければ
+  地域別なしとして保存する。既存のルールを残さないのは、画面から全部消したのか
+  項目ごと送られていないのかを区別できないため（SKU の一括保存と同じ）。
+  形はアプリ（`lib/shipping/region.ts`）と 0012 の検査制約の両方が見る。
 
 • POST /tenant/api/products（本体のみ。画像は `<tenant_id>/<product_id>/...` に置くため、商品IDが決まってから登録する）
 

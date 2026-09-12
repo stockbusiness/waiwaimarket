@@ -10,6 +10,8 @@
  * 積もって合計が合わなくなる（docs/02 の最大剰余方式も整数前提）。
  */
 
+import { type RegionRules, feeRange, regionFee } from "@/lib/shipping/region";
+
 /** 扱う税率。product_variants.tax_rate と同じ 2 種類（lib/validation/product.ts） */
 export type TaxRate = 0.1 | 0.08;
 
@@ -40,15 +42,31 @@ export function subtotalInclTax(lines: MoneyLine[]): number {
   return lines.reduce((sum, line) => sum + lineTotal(line), 0);
 }
 
+/**
+ * 送料の消費税率は 10% で固定する（docs/01）。
+ *
+ * **テナントが選べる値ではない。** 送料を別建てで請求する場合、送料は
+ * 運送役務の対価であって飲食料品の譲渡の対価ではないため、軽減税率の
+ * 対象にならない（国税庁「消費税の軽減税率制度に関するQ&A（個別事例編）」
+ * 問39）。8% の商品だけのカートでも、別建ての送料は 10% になる。
+ *
+ * 「送料込み価格」で売りたいテナントは送料を 0 円に設定して商品価格へ
+ * 含める。その場合は商品の税率（食品なら 8%）がそのまま適用され、
+ * 上の Q&A の例外にも結果として合う。設定項目を増やさずに両方書ける。
+ */
+export const SHIPPING_TAX_RATE: TaxRate = 0.1;
+
 export type ShippingRule = {
   baseFee: number;
   /**
    * この金額以上で送料無料。null なら常に baseFee。
    *
-   * 地域別送料（shipping_profiles.region_rules）は使っていない。
-   * jsonb の構造が docs で未定義のため、形を決めてから入れる。
+   * **地域別送料より優先する。** しきい値を超えたら地域別も 0 円
+   * （lib/shipping/region.ts）。
    */
   freeThreshold: number | null;
+  /** 地域別送料。既定は `EMPTY_REGION_RULES`（地域別なし） */
+  regionRules: RegionRules;
 };
 
 /**
@@ -56,10 +74,20 @@ export type ShippingRule = {
  *
  * 「5,000円以上で送料無料」と案内して 5,000円ちょうどが有料だと、
  * 案内と食い違う。
+ *
+ * **届け先が未指定なら範囲の下限を返す。** カートには配送先がまだ無い。
+ * 上限を出すと実際より高く見え、下限を出すと安く見えるが、下限に
+ * 「〜円から」を添えるほうが誤解が小さい。確定は購入手続きの住所入力後で、
+ * そこでは必ず `prefectureCode` を渡すこと。
  */
-export function shippingFee(rule: ShippingRule, subtotal: number): number {
+export function shippingFee(
+  rule: ShippingRule,
+  subtotal: number,
+  prefectureCode?: string | null,
+): number {
   if (rule.freeThreshold !== null && subtotal >= rule.freeThreshold) return 0;
-  return rule.baseFee;
+  if (prefectureCode) return regionFee(rule.regionRules, rule.baseFee, prefectureCode);
+  return feeRange(rule.regionRules, rule.baseFee).min;
 }
 
 export type TaxBucket = {
@@ -78,17 +106,27 @@ export type TaxBucket = {
  * **端数は切り捨て。** 税込価格から内税を割り戻すときの丸めは docs に
  * 指定が無く、切り捨てで決めた（2026-09-12 に確認）。
  *
- * **送料は含めない。** 送料の税率が docs で未定義のため。領収書を作る
- * フェーズ3-8 までに決める必要がある。いま含めると、決まっていない
- * 前提を数字に埋め込むことになる。
+ * **送料も含める。** 別建ての送料は 10%（`SHIPPING_TAX_RATE`）の側へ足す。
+ * 8% の商品だけのカートでも 10% の欄が立つのは、税率が商品ではなく
+ * 「運送役務」に対して決まるため（docs/01）。
+ *
+ * 送料は商品と合算してから割り戻す。1,000 円の商品（10%）と 800 円の送料を
+ * 別々に割り戻すと 90 + 72 = 162 だが、まとめると 1,800 × 10 / 110 = 163。
+ * 行ごとに割らないのと同じ理由で、税は取引単位で計算する。
  *
  * 税率の昇順で返す。表示順を呼び出し側ごとに決めさせない。
  */
-export function taxBreakdown(lines: MoneyLine[]): TaxBucket[] {
+export function taxBreakdown(lines: MoneyLine[], shipping = 0): TaxBucket[] {
   const byRate = new Map<TaxRate, number>();
 
   for (const line of lines) {
     byRate.set(line.taxRate, (byRate.get(line.taxRate) ?? 0) + lineTotal(line));
+  }
+
+  // 0 円の送料で 10% の欄を立てない。送料無料の注文に「消費税 0円」の
+  // 行だけが出るのを避ける
+  if (shipping > 0) {
+    byRate.set(SHIPPING_TAX_RATE, (byRate.get(SHIPPING_TAX_RATE) ?? 0) + shipping);
   }
 
   return [...byRate.entries()]
@@ -103,6 +141,12 @@ export function taxBreakdown(lines: MoneyLine[]): TaxBucket[] {
 export type OrderAmounts = {
   subtotalInclTax: number;
   shippingFee: number;
+  /**
+   * 届け先がまだ決まっておらず、届け先によって送料が変わる。
+   * このとき `shippingFee` は下限で、`totalCharged` も下限になる。
+   * 画面では「〜円から」と出し、確定していないことを示すこと。
+   */
+  shippingVaries: boolean;
   /** ポイント値引き。フェーズ4 までは 0 */
   pointDiscount: number;
   /** 実際に円で請求する額。orders.total_charged に入る */
@@ -123,18 +167,31 @@ export type OrderAmounts = {
 export function calculateOrderAmounts(params: {
   lines: MoneyLine[];
   shipping: ShippingRule;
+  /** 届け先の都道府県コード（JIS X 0401）。未指定なら送料は下限 */
+  prefectureCode?: string | null;
   pointDiscount?: number;
 }): OrderAmounts {
   const subtotal = subtotalInclTax(params.lines);
-  const shipping = shippingFee(params.shipping, subtotal);
+  const shipping = shippingFee(params.shipping, subtotal, params.prefectureCode);
   const pointDiscount = params.pointDiscount ?? 0;
+
+  // しきい値で無料になっているなら、届け先が決まっても金額は動かない。
+  // 「送料が 0 円だから動かない」と書くと間違う。基本送料 0 円で沖縄だけ
+  // 1,500 円という設定では下限が 0 円になり、無料なのに動く場合がある
+  const freeByThreshold =
+    params.shipping.freeThreshold !== null && subtotal >= params.shipping.freeThreshold;
+  const varies =
+    !params.prefectureCode &&
+    !freeByThreshold &&
+    feeRange(params.shipping.regionRules, params.shipping.baseFee).varies;
 
   return {
     subtotalInclTax: subtotal,
     shippingFee: shipping,
+    shippingVaries: varies,
     pointDiscount,
     totalCharged: Math.max(0, subtotal + shipping - pointDiscount),
-    taxes: taxBreakdown(params.lines),
+    taxes: taxBreakdown(params.lines, shipping),
   };
 }
 

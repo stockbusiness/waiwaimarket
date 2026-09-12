@@ -8,10 +8,21 @@ import {
   subtotalInclTax,
   taxBreakdown,
   type MoneyLine,
+  type ShippingRule,
 } from "@/lib/orders/money";
+import { EMPTY_REGION_RULES, type RegionRules } from "@/lib/shipping/region";
 
 function line(over: Partial<MoneyLine> = {}): MoneyLine {
   return { unitPriceInclTax: 1000, quantity: 1, taxRate: 0.1, ...over };
+}
+
+/** 地域別なしの送料規則。地域別は tests/shipping/region.test.ts で見る */
+function ship(baseFee: number, freeThreshold: number | null = null): ShippingRule {
+  return { baseFee, freeThreshold, regionRules: EMPTY_REGION_RULES };
+}
+
+function rules(...entries: Array<{ prefectures: string[]; fee: number }>): RegionRules {
+  return { version: 1, rules: entries };
 }
 
 describe("小計", () => {
@@ -31,7 +42,7 @@ describe("小計", () => {
 });
 
 describe("送料", () => {
-  const rule = { baseFee: 800, freeThreshold: 5000 };
+  const rule = ship(800, 5000);
 
   it("しきい値未満は基本送料", () => {
     expect(shippingFee(rule, 4999)).toBe(800);
@@ -48,11 +59,11 @@ describe("送料", () => {
   });
 
   it("しきい値が無ければ常に基本送料", () => {
-    expect(shippingFee({ baseFee: 800, freeThreshold: null }, 100000)).toBe(800);
+    expect(shippingFee(ship(800), 100000)).toBe(800);
   });
 
   it("基本送料 0 は無料のまま", () => {
-    expect(shippingFee({ baseFee: 0, freeThreshold: null }, 0)).toBe(0);
+    expect(shippingFee(ship(0), 0)).toBe(0);
   });
 });
 
@@ -107,13 +118,43 @@ describe("税率別の内訳", () => {
     }
   });
 
-  it("送料は含めない（税率が docs で未定義のため）", () => {
+  it("送料は 10% の側へ足し、商品と合算してから割り戻す", () => {
     const amounts = calculateOrderAmounts({
       lines: [line({ unitPriceInclTax: 1000 })],
-      shipping: { baseFee: 800, freeThreshold: null },
+      shipping: ship(800),
+    });
+    // 別々に割ると 90 + 72 = 162。まとめて 1800 × 10 / 110 = 163.6... → 163
+    expect(amounts.taxes).toEqual([
+      { rate: 0.1, totalInclTax: 1800, tax: 163, totalExclTax: 1637 },
+    ]);
+  });
+
+  it("8% の商品だけでも送料は 10% に立つ", () => {
+    // 送料は運送役務の対価で、飲食料品の譲渡の対価ではない
+    // （国税庁 軽減税率Q&A 個別事例編 問39）。商品が 8% でも送料は 10%
+    const amounts = calculateOrderAmounts({
+      lines: [line({ unitPriceInclTax: 1080, taxRate: 0.08 })],
+      shipping: ship(800),
     });
     expect(amounts.taxes).toEqual([
-      { rate: 0.1, totalInclTax: 1000, tax: 90, totalExclTax: 910 },
+      { rate: 0.08, totalInclTax: 1080, tax: 80, totalExclTax: 1000 },
+      { rate: 0.1, totalInclTax: 800, tax: 72, totalExclTax: 728 },
+    ]);
+  });
+
+  it("送料 0 円のときは 10% の欄を立てない", () => {
+    // 送料無料の注文に「消費税 0円」の行だけが出るのを避ける
+    const amounts = calculateOrderAmounts({
+      lines: [line({ unitPriceInclTax: 1080, taxRate: 0.08 })],
+      shipping: ship(800, 1000),
+    });
+    expect(amounts.shippingFee).toBe(0);
+    expect(amounts.taxes.map((bucket) => bucket.rate)).toEqual([0.08]);
+  });
+
+  it("商品が無く送料だけでも内訳が出る", () => {
+    expect(taxBreakdown([], 800)).toEqual([
+      { rate: 0.1, totalInclTax: 800, tax: 72, totalExclTax: 728 },
     ]);
   });
 
@@ -136,7 +177,7 @@ describe("注文金額一式", () => {
   it("小計 + 送料 − ポイント値引き", () => {
     const amounts = calculateOrderAmounts({
       lines: [line({ unitPriceInclTax: 2480, quantity: 2 })],
-      shipping: { baseFee: 800, freeThreshold: 10000 },
+      shipping: ship(800, 10000),
     });
     expect(amounts.subtotalInclTax).toBe(4960);
     expect(amounts.shippingFee).toBe(800);
@@ -147,7 +188,7 @@ describe("注文金額一式", () => {
   it("送料無料になると合計から落ちる", () => {
     const amounts = calculateOrderAmounts({
       lines: [line({ unitPriceInclTax: 5000 })],
-      shipping: { baseFee: 800, freeThreshold: 5000 },
+      shipping: ship(800, 5000),
     });
     expect(amounts.shippingFee).toBe(0);
     expect(amounts.totalCharged).toBe(5000);
@@ -156,7 +197,7 @@ describe("注文金額一式", () => {
   it("ポイント値引きを引く（フェーズ4 で使う）", () => {
     const amounts = calculateOrderAmounts({
       lines: [line({ unitPriceInclTax: 3000 })],
-      shipping: { baseFee: 0, freeThreshold: null },
+      shipping: ship(0),
       pointDiscount: 500,
     });
     expect(amounts.totalCharged).toBe(2500);
@@ -165,7 +206,7 @@ describe("注文金額一式", () => {
   it("値引きが合計を超えても負にしない", () => {
     const amounts = calculateOrderAmounts({
       lines: [line({ unitPriceInclTax: 100 })],
-      shipping: { baseFee: 0, freeThreshold: null },
+      shipping: ship(0),
       pointDiscount: 99999,
     });
     expect(amounts.totalCharged).toBe(0);
@@ -174,13 +215,77 @@ describe("注文金額一式", () => {
   it("空のカートでも落ちない", () => {
     const amounts = calculateOrderAmounts({
       lines: [],
-      shipping: { baseFee: 800, freeThreshold: 5000 },
+      shipping: ship(800, 5000),
     });
     expect(amounts.subtotalInclTax).toBe(0);
     // 商品が無いのに送料だけ取らない、という判断は呼び出し側（カート画面は
     // 空なら何も出さない）。ここは規則どおり基本送料を返す
     expect(amounts.shippingFee).toBe(800);
-    expect(amounts.taxes).toEqual([]);
+    // 送料が乗るので内訳は空にならない
+    expect(amounts.taxes).toEqual([
+      { rate: 0.1, totalInclTax: 800, tax: 72, totalExclTax: 728 },
+    ]);
+  });
+});
+
+describe("地域別送料", () => {
+  const okinawa = rules({ prefectures: ["47"], fee: 1500 });
+
+  it("届け先を渡すとその都道府県の金額になる", () => {
+    const shipping = { baseFee: 800, freeThreshold: null, regionRules: okinawa };
+    expect(shippingFee(shipping, 1000, "47")).toBe(1500);
+    expect(shippingFee(shipping, 1000, "13")).toBe(800);
+  });
+
+  it("届け先が未指定なら下限を返し、変わることを伝える", () => {
+    const amounts = calculateOrderAmounts({
+      lines: [line({ unitPriceInclTax: 1000 })],
+      shipping: { baseFee: 800, freeThreshold: null, regionRules: okinawa },
+    });
+    expect(amounts.shippingFee).toBe(800);
+    expect(amounts.shippingVaries).toBe(true);
+    expect(amounts.totalCharged).toBe(1800);
+  });
+
+  it("届け先を渡せば確定として扱う", () => {
+    const amounts = calculateOrderAmounts({
+      lines: [line({ unitPriceInclTax: 1000 })],
+      shipping: { baseFee: 800, freeThreshold: null, regionRules: okinawa },
+      prefectureCode: "47",
+    });
+    expect(amounts.shippingFee).toBe(1500);
+    expect(amounts.shippingVaries).toBe(false);
+  });
+
+  it("送料無料しきい値が地域別より優先する", () => {
+    const shipping = { baseFee: 800, freeThreshold: 5000, regionRules: okinawa };
+    expect(shippingFee(shipping, 5000, "47")).toBe(0);
+
+    const amounts = calculateOrderAmounts({
+      lines: [line({ unitPriceInclTax: 5000 })],
+      shipping,
+    });
+    expect(amounts.shippingFee).toBe(0);
+    // しきい値で無料なら届け先が決まっても動かない
+    expect(amounts.shippingVaries).toBe(false);
+  });
+
+  it("基本送料 0 円でも、地域別があれば変わると伝える", () => {
+    // 下限が 0 円になる。「送料が 0 だから確定」と判定すると取りこぼす
+    const amounts = calculateOrderAmounts({
+      lines: [line({ unitPriceInclTax: 1000 })],
+      shipping: { baseFee: 0, freeThreshold: null, regionRules: okinawa },
+    });
+    expect(amounts.shippingFee).toBe(0);
+    expect(amounts.shippingVaries).toBe(true);
+  });
+
+  it("地域別が無ければ変わらない", () => {
+    const amounts = calculateOrderAmounts({
+      lines: [line({ unitPriceInclTax: 1000 })],
+      shipping: ship(800),
+    });
+    expect(amounts.shippingVaries).toBe(false);
   });
 });
 

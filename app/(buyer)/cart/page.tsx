@@ -79,7 +79,10 @@ function CartSection({ cart }: { cart: CartView }) {
         <dl className="flex flex-col gap-2 text-sm">
           <Row label="小計">{formatYen(cart.amounts.subtotalInclTax)}</Row>
           <Row label="送料">
-            {cart.amounts.shippingFee === 0 ? "無料" : formatYen(cart.amounts.shippingFee)}
+            {cart.amounts.shippingFee === 0 && !cart.amounts.shippingVaries
+              ? "無料"
+              : // 届け先が決まるまで確定しない。下限に「〜」を添える
+                `${formatYen(cart.amounts.shippingFee)}${cart.amounts.shippingVaries ? "〜" : ""}`}
           </Row>
 
           {cart.amounts.taxes.map((bucket) => (
@@ -93,13 +96,19 @@ function CartSection({ cart }: { cart: CartView }) {
 
           <div className="mt-1 flex items-baseline justify-between gap-4 border-t border-line pt-2">
             <dt className="font-bold">合計</dt>
-            <dd className="text-lg font-bold">{formatYen(cart.amounts.totalCharged)}</dd>
+            <dd className="text-lg font-bold">
+              {formatYen(cart.amounts.totalCharged)}
+              {cart.amounts.shippingVaries ? "〜" : ""}
+            </dd>
           </div>
         </dl>
 
         <p className="mt-3 text-xs leading-5 text-subtle">
-          発送の目安は約 {cart.shipping.leadTimeDays} 日です。消費税は商品代に
-          含まれています（送料の内訳は購入手続きで確定します）。
+          発送の目安は約 {cart.shipping.leadTimeDays} 日です。消費税は商品代と
+          送料に含まれています（送料は 10%）。
+          {cart.amounts.shippingVaries
+            ? "送料はお届け先の都道府県によって変わるため、購入手続きで確定します。"
+            : null}
         </p>
       </Card>
 

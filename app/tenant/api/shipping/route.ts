@@ -11,8 +11,8 @@ import { shippingProfileSchema } from "@/lib/validation/shipping";
  * 1 テナント 1 件なので upsert。0004 の shipping_profiles_tenant_write が
  * 効くため anon クライアントで書ける。
  *
- * 地域別送料（region_rules）はここでは扱わない。jsonb の構造が docs で
- * 未定義のため、形を決めてから入れる。
+ * 地域別送料（region_rules）の形は lib/shipping/region.ts が見る。
+ * 同じ形を 0012 の検査制約でも見ていて、ここを通り抜けても DB が弾く。
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -44,6 +44,7 @@ export async function PUT(request: NextRequest) {
       base_fee: parsed.data.baseFee,
       free_threshold: parsed.data.freeThreshold ?? null,
       lead_time_days: parsed.data.leadTimeDays,
+      region_rules: parsed.data.regionRules,
     };
 
     const { error } = existing
@@ -64,6 +65,7 @@ export async function PUT(request: NextRequest) {
         base_fee: parsed.data.baseFee,
         free_threshold: parsed.data.freeThreshold ?? null,
         lead_time_days: parsed.data.leadTimeDays,
+        region_rule_count: parsed.data.regionRules.rules.length,
       },
       ip: request.headers.get("x-forwarded-for"),
     });
