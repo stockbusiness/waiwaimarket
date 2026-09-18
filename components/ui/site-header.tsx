@@ -7,14 +7,21 @@ import { ButtonLink } from "./button";
  * 共通ヘッダー。
  *
  * 上段にロゴ、下段に主要導線を置く 2 段構成。区切りは薄い罫線のみで影は使わない。
+ */
+
+/**
+ * ロゴ。
  *
- * ロゴの文言は暫定。マーケットの正式名称はフェーズ0 で決める
- * （CLAUDE.md 未確定事項）。決まったらここを差し替える。
+ * **画像ではなく文字で出している。** ロゴ画像の正式データ（背景が透明な SVG）が
+ * まだ無いため。JPG をそのまま置くと白い四角が背景に残り、暗い面で浮く。
+ * データが届いたら `img` に差し替える（高さは 56px の枠に収める）。
+ *
+ * 文言は日本語表記で固定する（app/layout.tsx のコメント参照）。
  */
 function Logo({ href }: { href: string }) {
   return (
     <Link href={href} className="rounded-sm text-lg font-bold tracking-tight">
-      一般物販マーケット
+      ワイワイマーケット
     </Link>
   );
 }

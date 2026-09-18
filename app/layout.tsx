@@ -2,10 +2,16 @@ import type { Metadata } from "next";
 
 import "./globals.css";
 
+/**
+ * 正式名称は「ワイワイマーケット」（英字表記 waiwaimarket、2026-09-18 決定）。
+ *
+ * **画面の文字は日本語表記にする。** 購入者は日本語圏で、検索やブックマークで
+ * 読み取りやすい。英字の `waiwaimarket` はロゴ画像とメールの差出人名に使う。
+ * 英字は小文字・1 語で固定する（WaiWai Market のような表記ゆれを作らない）。
+ */
 export const metadata: Metadata = {
-  // 正式名称はフェーズ0で決定する（CLAUDE.md 未確定事項）
-  title: { default: "一般物販マーケット", template: "%s｜一般物販マーケット" },
-  description: "審査を通過したテナントが出品する一般物販マーケットです。",
+  title: { default: "ワイワイマーケット", template: "%s｜ワイワイマーケット" },
+  description: "審査を通過したテナントが出品するワイワイマーケットです。",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
