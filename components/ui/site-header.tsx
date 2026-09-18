@@ -35,10 +35,13 @@ function Logo({ href }: { href: string }) {
  *
  * 並び順はロゴを実測して合わせてある（朱→黄→ティール→黄）。
  * 装飾なので読み上げからは外す。
+ *
+ * 高さは 8px（2026-09-18）。最初は 4px にしていたが、画面で見ると細すぎて
+ * 気づかれなかった。12px 以上にすると帯のほうがロゴより目立つ。
  */
 function AwningStripe() {
   return (
-    <div aria-hidden className="flex h-1">
+    <div aria-hidden className="flex h-2">
       <div className="flex-1 bg-brand-coral" />
       <div className="flex-1 bg-brand-amber" />
       <div className="flex-1 bg-brand-teal" />
