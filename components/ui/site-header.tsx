@@ -26,9 +26,31 @@ function Logo({ href }: { href: string }) {
   );
 }
 
+/**
+ * 幌のストライプ。ロゴのマークをそのまま細い帯にしたもの。
+ *
+ * ブランドの朱・黄・ティールは文字に使えない（白地でのコントラストが
+ * 3.38 / 1.77 / 3.23 で AA に届かない。app/globals.css 参照）。
+ * 面にしか置けないので、ここで画面の一番上に出してロゴとつなげる。
+ *
+ * 並び順はロゴを実測して合わせてある（朱→黄→ティール→黄）。
+ * 装飾なので読み上げからは外す。
+ */
+function AwningStripe() {
+  return (
+    <div aria-hidden className="flex h-1">
+      <div className="flex-1 bg-brand-coral" />
+      <div className="flex-1 bg-brand-amber" />
+      <div className="flex-1 bg-brand-teal" />
+      <div className="flex-1 bg-brand-amber" />
+    </div>
+  );
+}
+
 function Bar({ children }: { children: ReactNode }) {
   return (
     <header className="border-b border-line bg-raised">
+      <AwningStripe />
       <div className="mx-auto w-full max-w-4xl px-4 sm:px-6">{children}</div>
     </header>
   );

@@ -83,17 +83,49 @@ describe("app/globals.css", () => {
     }
   });
 
-  it("明暗どちらの値も定義されている", () => {
-    expect(css).toContain("prefers-color-scheme: dark");
-    for (const token of ["--surface", "--body", "--muted", "--line", "--accent"]) {
-      // ライト側とダーク側で 2 回以上出る（@theme inline での参照を含む）
-      const defined = css.split(`${token}:`).length - 1;
-      expect(defined).toBeGreaterThanOrEqual(2);
+  it("必要なトークンがすべて定義されている", () => {
+    for (const token of [
+      "--surface",
+      "--raised",
+      "--body",
+      "--muted",
+      "--subtle",
+      "--line",
+      "--line-strong",
+      "--accent",
+      "--on-accent",
+      "--link",
+      "--footer",
+      "--on-footer",
+      "--brand-coral",
+      "--brand-amber",
+      "--brand-teal",
+      "--danger",
+      "--success",
+      "--warning",
+    ]) {
+      expect(css).toContain(`${token}:`);
+      // @theme inline 側の参照も要る。片方だけだとクラスが生えない
+      expect(css).toMatch(new RegExp(`--color-${token.slice(2)}:\\s*var\\(${token}\\)`));
     }
   });
 
+  it("ダークモードを持たない（2026-09-18 決定）", () => {
+    // 判定はコメントを除いた本体に対して行う。決定の経緯を書いたコメントに
+    // `prefers-color-scheme` の語が出るため、生の文字列を見ると常に落ちる
+    const code = stripComments(css);
+
+    // 「白を既定にする」という指定は無い。端末の設定を見るのをやめることでしか
+    // 白を固定できないので、この 2 つは対になっている
+    expect(code).not.toContain("prefers-color-scheme");
+    expect(code).toMatch(/color-scheme:\s*light\s*;/);
+    // `light dark` に戻すと、端末がダークのときセレクトやスクロールバーだけ
+    // 黒く残り、白いページの上で浮く
+    expect(code).not.toMatch(/color-scheme:\s*light\s+dark/);
+  });
+
   it("@theme は inline で、値を焼き込まず var() を参照する", () => {
-    // inline を落とすとメディアクエリで色が切り替わらなくなる
+    // inline を落とすと、トークンを 1 か所で差し替えられなくなる
     expect(css).toContain("@theme inline");
     expect(css).toMatch(/--color-surface:\s*var\(--surface\)/);
   });
