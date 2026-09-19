@@ -2,8 +2,13 @@ import Link from "next/link";
 
 import { listPublishedPages } from "@/lib/site/pages";
 
+import { AwningStripe } from "./awning-stripe";
+
 /**
- * 共通フッター。主要操作と同じ青地に白文字のリンク一覧。
+ * 共通フッター。主要操作と同じ紺地に白文字のリンク一覧。
+ *
+ * 上端にヘッダーと同じ幌のストライプを置く。白い本文と紺のフッターの
+ * 境目を兼ねるので、罫線を別に引く必要がない。
  *
  * 掲載するのは実在する画面だけにする。リンク切れを置くほうが、
  * 項目が少ないことより悪い。「マーケットについて」の列は本部が
@@ -40,6 +45,7 @@ export async function SiteFooter() {
 
   return (
     <footer className="mt-auto bg-footer text-on-footer">
+      <AwningStripe />
       <div className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
         <div className="grid gap-8 sm:grid-cols-3">
           {sections.map((section) => (
