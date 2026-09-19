@@ -31,6 +31,22 @@ export type ProductStatus =
 export type ProductPricingMode = "fixed" | "inquiry";
 export type InquiryStatus = "open" | "answered" | "closed";
 export type InquirySenderRole = "buyer" | "tenant";
+/** 台帳の増減の種類（docs/02 6.2） */
+export type PointEntryType =
+  | "earn_pending"
+  | "earn_confirmed"
+  | "spend"
+  | "spend_refund"
+  | "earn_reversal"
+  | "expire"
+  | "adjustment";
+export type PointLotStatus =
+  | "pending"
+  | "available"
+  | "exhausted"
+  | "expired"
+  | "reversed";
+export type PointRuleScope = "base" | "product" | "store" | "campaign";
 export type TenantMemberRole = "owner" | "staff";
 export type TenantStatus =
   | "applied"
@@ -674,8 +690,171 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      point_rules: {
+        Row: {
+          id: string;
+          scope: PointRuleScope;
+          target_id: string | null;
+          /** numeric(5,4)。**文字列で返る。** `parseRatio()` で読むこと */
+          rate: string;
+          /** numeric(4,3)。同上 */
+          usage_cap_ratio: string;
+          confirm_after_days: number;
+          expire_after_months: number;
+          funding_source_id: string | null;
+          effective_from: string;
+          effective_to: string | null;
+        };
+        /**
+         * **上書きせず版として積む**（docs/02 6.1）。変更は前の版を閉じて
+         * から新しい版を足す。順序を逆にすると 0016 の部分一意索引
+         * （`point_rules_one_open_base`）に弾かれる。
+         */
+        Insert: {
+          scope: PointRuleScope;
+          target_id?: string | null;
+          rate: string | number;
+          usage_cap_ratio: string | number;
+          confirm_after_days: number;
+          expire_after_months: number;
+          funding_source_id?: string | null;
+          effective_from?: string;
+          effective_to?: string | null;
+        };
+        /** 閉じる以外に既存の版を触らない */
+        Update: {
+          effective_to?: string | null;
+        };
+        Relationships: [];
+      };
+      point_ledger_entries: {
+        Row: {
+          id: string;
+          buyer_id: string;
+          entry_type: PointEntryType;
+          delta: number;
+          lot_id: string | null;
+          order_id: string | null;
+          order_item_id: string | null;
+          funding_source_id: string | null;
+          reversal_of: string | null;
+          reason: string;
+          actor_id: string | null;
+          idempotency_key: string;
+          occurred_at: string;
+        };
+        Insert: {
+          buyer_id: string;
+          entry_type: PointEntryType;
+          delta: number;
+          lot_id?: string | null;
+          order_id?: string | null;
+          order_item_id?: string | null;
+          funding_source_id?: string | null;
+          reversal_of?: string | null;
+          reason: string;
+          actor_id?: string | null;
+          /** `order_item_id + entry_type + sequence`。一意制約が重複を拒否 */
+          idempotency_key: string;
+        };
+        /**
+         * **追記専用**（CLAUDE.md 絶対ルール）。訂正・取消は反対取引の行を
+         * 追加する。既存の行を直せる型を持たせない。
+         */
+        Update: never;
+        Relationships: [];
+      };
+      point_lots: {
+        Row: {
+          id: string;
+          buyer_id: string;
+          order_id: string | null;
+          order_item_id: string | null;
+          funding_source_id: string | null;
+          point_rule_id: string | null;
+          status: PointLotStatus;
+          granted_points: number;
+          remaining_points: number;
+          expires_at: string;
+          confirmed_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          buyer_id: string;
+          order_id?: string | null;
+          order_item_id?: string | null;
+          funding_source_id?: string | null;
+          point_rule_id?: string | null;
+          status?: PointLotStatus;
+          granted_points: number;
+          remaining_points: number;
+          expires_at: string;
+        };
+        /** 残量と状態だけが動く。付与数と期限は付与時点のまま */
+        Update: {
+          status?: PointLotStatus;
+          remaining_points?: number;
+          confirmed_at?: string | null;
+        };
+        Relationships: [];
+      };
+      point_accounts: {
+        Row: { buyer_id: string; created_at: string };
+        Insert: { buyer_id: string };
+        Update: never;
+        Relationships: [];
+      };
     };
-    Views: Record<never, never>;
+    Views: {
+      /**
+       * 台帳とロットからの算出残高（0005）。`security_invoker = on` なので
+       * ビュー越しでも他人の残高は見えない。
+       */
+      point_balances: {
+        Row: {
+          buyer_id: string;
+          available_points: number;
+          pending_points: number;
+          reserved_points: number;
+          /** 予約中を除いた残高。**マイナスになりうる**（docs/02 6.4） */
+          usable_points: number;
+        };
+        Relationships: [];
+      };
+      /**
+       * 負担元・ルール種別ごとの未使用ポイント（0005）。本部の発行状況に使う。
+       * `security_invoker = on` なので、読めるのは `point_lots_hq_read` を
+       * 通せる本部オペレーター以上に限られる。
+       */
+      point_outstanding_liability: {
+        Row: {
+          funding_source_type: string;
+          tenant_id: string | null;
+          rule_scope: string;
+          pending_points: number;
+          available_points: number;
+          /** 額面ベースの最大値引き原資（確定待ち＋利用可能） */
+          max_discount_reserve: number;
+        };
+        Relationships: [];
+      };
+      /** 月次の発行・確定・利用・失効（0005）。`year_month` は月初の日付 */
+      point_monthly_movements: {
+        Row: {
+          year_month: string;
+          funding_source_type: string;
+          rule_scope: string;
+          issued_points: number;
+          confirmed_points: number;
+          used_points: number;
+          refunded_points: number;
+          expired_points: number;
+          reversed_points: number;
+          adjusted_points: number;
+        };
+        Relationships: [];
+      };
+    };
     Functions: {
       current_hq_role: {
         Args: Record<string, never>;
@@ -748,6 +927,8 @@ export type Database = {
       inquiry_status: InquiryStatus;
       inquiry_sender_role: InquirySenderRole;
       order_status: OrderStatus;
+      point_entry_type: PointEntryType;
+      point_lot_status: PointLotStatus;
     };
     CompositeTypes: Record<never, never>;
   };

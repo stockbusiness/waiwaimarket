@@ -34,6 +34,7 @@ export default async function AdminHome() {
         <TextLink href="/admin/products">商品審査</TextLink>
         <TextLink href="/admin/orders">注文（閲覧のみ）</TextLink>
         <TextLink href="/admin/inquiries">問い合わせ（閲覧のみ）</TextLink>
+        <TextLink href="/admin/points">オーリーポイント（還元ルール・発行状況）</TextLink>
         <TextLink href="/admin/categories">商品カテゴリー</TextLink>
         <TextLink href="/admin/pages">サイトページ（規約・特商法表記など）</TextLink>
       </nav>

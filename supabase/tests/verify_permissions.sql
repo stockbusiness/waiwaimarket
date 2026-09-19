@@ -34,7 +34,10 @@ insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111112', 'staff1@example.test'),
   ('22222222-2222-2222-2222-222222222221', 'owner2@example.test'),
   ('33333333-3333-3333-3333-333333333331', 'owner3@example.test'),
-  ('99999999-9999-9999-9999-999999999991', 'hq@example.test');
+  ('99999999-9999-9999-9999-999999999991', 'hq@example.test'),
+  -- 17 章で使う。本部の中でも管理者とオペレーターで線が引かれているため、
+  -- オペレーターの側も用意しないと「書けないこと」を測れない
+  ('99999999-9999-9999-9999-999999999992', 'hq-operator@example.test');
 
 insert into tenants (id, name, status) values
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', '検証テナント1', 'approved'),
@@ -59,7 +62,8 @@ insert into stores (tenant_id, slug, display_name, is_public) values
   ('cccccccc-cccc-cccc-cccc-ccccccccccc1', 'verify-pending-3', '未承認店舗3', true);
 
 insert into hq_members (user_id, role, display_name) values
-  ('99999999-9999-9999-9999-999999999991', 'hq_admin', '検証本部');
+  ('99999999-9999-9999-9999-999999999991', 'hq_admin', '検証本部'),
+  ('99999999-9999-9999-9999-999999999992', 'hq_operator', '検証本部オペレーター');
 
 insert into audit_logs (actor_id, actor_role, action, target_table, target_id) values
   ('99999999-9999-9999-9999-999999999991', 'hq_admin', 'verify.probe', 'tenants',
@@ -1157,9 +1161,196 @@ select '発送登録の EXECUTE を剥がしていない', 'true',
             then 'PASS' else 'FAIL' end;
 
 -- ------------------------------------------------------------
+-- 17. ポイントのルールと残高（0016・フェーズ4）
+-- ------------------------------------------------------------
+-- 本部の中でも線が引かれている。閲覧はオペレーターまで、変更は管理者だけ
+-- （docs/00 5.4、0004 の point_rules_hq_read / point_rules_hq_write）。
+-- 還元率は「いくら払うか」を決める値なので、読めることと変えられることを
+-- 別々に測る。
+reset role;
+-- いま開いている基本ルールを控える。0016 が入れた id を直接書かない
+-- （初期データの id に依存すると、運用で版が積まれた後に動かなくなる）
+select set_config('verify.rule',
+  (select id::text from point_rules where scope = 'base' and effective_to is null), false);
+
+set role anon;
+set request.jwt.claim.sub = '';
+set request.jwt.claims = '{"role":"anon"}';
+select set_config('verify.v', (select count(*)::text from point_rules), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名はポイントのルールを読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+set role authenticated;
+set request.jwt.claim.sub = '99999999-9999-9999-9999-999999999992';
+set request.jwt.claims = '{"sub":"99999999-9999-9999-9999-999999999992","role":"authenticated"}';
+select set_config('verify.v',
+  (select count(*)::text from point_rules where scope = 'base' and effective_to is null), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '本部オペレーターは基本ルールを読める', '1', current_setting('verify.v'),
+       case when current_setting('verify.v') = '1' then 'PASS' else 'FAIL' end;
+
+-- **例外は出ない。** point_rules_hq_write の using が外れるだけなので
+-- 0 件更新になる（0014 で一度これを「通った」と読み違えた）。
+-- 値が変わっていないことを直接見る。
+set role authenticated;
+update point_rules set rate = 0.9999
+ where id = current_setting('verify.rule')::uuid;
+reset role;
+select set_config('verify.v',
+  (select rate::text from point_rules where id = current_setting('verify.rule')::uuid), false);
+insert into _perm_results (item, expected, actual, verdict)
+select '本部オペレーターは還元率を変えられない', '0.0100', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0.0100' then 'PASS' else 'FAIL' end;
+
+-- こちらは with check に当たるので例外になる（0015 と同じ組み合わせ）
+set role authenticated;
+do $$
+begin
+  insert into point_rules (scope, target_id, rate, usage_cap_ratio,
+                           confirm_after_days, expire_after_months, effective_from)
+  values ('campaign', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', 0.0500, 0.500, 14, 12, now());
+  perform set_config('verify.v', '通過', false);
+exception when others then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '本部オペレーターはルールを足せない', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+-- 本部管理者として。閉じずに 2 本目を足すと 0016 の部分一意索引が拒否する
+set role authenticated;
+set request.jwt.claim.sub = '99999999-9999-9999-9999-999999999991';
+set request.jwt.claims = '{"sub":"99999999-9999-9999-9999-999999999991","role":"authenticated"}';
+do $$
+begin
+  insert into point_rules (id, scope, target_id, rate, usage_cap_ratio,
+                           confirm_after_days, expire_after_months, effective_from)
+  values ('f1000000-0000-4000-9000-0000000000ff', 'base', null, 0.0200, 0.500, 14, 12, now());
+  perform set_config('verify.v', '通過', false);
+exception when others then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '前を閉じずに基本ルールを足せない', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+-- 先に閉じてから足すと通る。順序が要点（0013 の既定配送先と同じ）
+set role authenticated;
+do $$
+begin
+  update point_rules set effective_to = now()
+   where id = current_setting('verify.rule')::uuid and effective_to is null;
+  insert into point_rules (id, scope, target_id, rate, usage_cap_ratio,
+                           confirm_after_days, expire_after_months, effective_from)
+  values ('f1000000-0000-4000-9000-0000000000ff', 'base', null, 0.0200, 0.500, 14, 12, now());
+  perform set_config('verify.v', '通過', false);
+exception when others then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '本部管理者は前を閉じてから新しい版を足せる', '通過', current_setting('verify.v'),
+       case when current_setting('verify.v') = '通過' then 'PASS' else 'FAIL' end;
+
+insert into _perm_results (item, expected, actual, verdict)
+select '版を積んでも開いている基本ルールは 1 本', '1',
+       (select count(*)::text from point_rules where scope = 'base' and effective_to is null),
+       case when (select count(*) from point_rules
+                   where scope = 'base' and effective_to is null) = 1
+            then 'PASS' else 'FAIL' end;
+
+-- 残高。口座・ロット・台帳を用意して、他人から見えないことを測る
+reset role;
+insert into point_accounts (buyer_id) values
+  ('00000000-0000-4000-8000-000000000001'),
+  ('00000000-0000-4000-8000-000000000002')
+on conflict (buyer_id) do nothing;
+
+insert into point_lots (id, buyer_id, funding_source_id, status, granted_points,
+                        remaining_points, expires_at, point_rule_id)
+values ('10770000-0000-4000-9000-00000000000a', '00000000-0000-4000-8000-000000000001',
+        'f0000000-0000-4000-9000-000000000001', 'available', 300, 300,
+        now() + interval '365 days', current_setting('verify.rule')::uuid);
+
+insert into point_ledger_entries (buyer_id, entry_type, delta, lot_id, reason, idempotency_key)
+values ('00000000-0000-4000-8000-000000000001', 'earn_confirmed', 300,
+        '10770000-0000-4000-9000-00000000000a', '検証用の付与', 'verify-point-1');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-4000-8000-000000000002';
+set request.jwt.claims = '{"sub":"00000000-0000-4000-8000-000000000002","role":"authenticated"}';
+select set_config('verify.v',
+  (select coalesce(sum(available_points), 0)::text from point_balances), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '購入者は他人のポイント残高を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-4000-8000-000000000001';
+set request.jwt.claims = '{"sub":"00000000-0000-4000-8000-000000000001","role":"authenticated"}';
+select set_config('verify.v',
+  (select coalesce(sum(available_points), 0)::text from point_balances), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '購入者は自分のポイント残高を読める', '300', current_setting('verify.v'),
+       case when current_setting('verify.v') = '300' then 'PASS' else 'FAIL' end;
+
+-- 台帳は追記専用（CLAUDE.md 絶対ルール）。本人でも書き換えられない。
+-- update のポリシーが無いので 0 件更新になり例外は出ない。中身を直接見る
+set role authenticated;
+update point_ledger_entries set delta = 99999 where idempotency_key = 'verify-point-1';
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '購入者は台帳の行を書き換えられない', '300',
+       (select delta::text from point_ledger_entries where idempotency_key = 'verify-point-1'),
+       case when (select delta from point_ledger_entries
+                   where idempotency_key = 'verify-point-1') = 300
+            then 'PASS' else 'FAIL' end;
+
+-- 本部の発行状況。ビューは security_invoker なので hq_read_lots 越しに見える
+set role authenticated;
+set request.jwt.claim.sub = '99999999-9999-9999-9999-999999999992';
+set request.jwt.claims = '{"sub":"99999999-9999-9999-9999-999999999992","role":"authenticated"}';
+select set_config('verify.v',
+  (select coalesce(sum(max_discount_reserve), 0)::text from point_outstanding_liability), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '本部オペレーターは未使用ポイントの集計を読める', '300', current_setting('verify.v'),
+       case when current_setting('verify.v') = '300' then 'PASS' else 'FAIL' end;
+
+set role anon;
+set request.jwt.claim.sub = '';
+set request.jwt.claims = '{"role":"anon"}';
+select set_config('verify.v',
+  (select count(*)::text from point_outstanding_liability), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は未使用ポイントの集計を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- ------------------------------------------------------------
 -- 後片付け
 -- ------------------------------------------------------------
 reset role;
+-- ポイント。台帳は追記専用なので、所有者でもトリガを止めないと消せない
+-- （問い合わせの発言と同じ事情。本番では実行しないこと）。
+alter table point_ledger_entries disable trigger point_ledger_no_delete;
+delete from point_ledger_entries where idempotency_key = 'verify-point-1';
+alter table point_ledger_entries enable trigger point_ledger_no_delete;
+delete from point_lots where id = '10770000-0000-4000-9000-00000000000a';
+delete from point_accounts where buyer_id in ('00000000-0000-4000-8000-000000000001',
+                                              '00000000-0000-4000-8000-000000000002');
+-- 検証で積んだ版を外し、元の版を開き直す。**この順序でないと**
+-- 部分一意索引が「開いている基本ルールが 2 本」を拒否する
+delete from point_rules where id = 'f1000000-0000-4000-9000-0000000000ff';
+update point_rules set effective_to = null
+ where id = current_setting('verify.rule', true)::uuid;
 -- **検証用テナントに紐づく注文をまとめて消す。** `orders.tenant_id` は
 -- `tenants` への外部キーなので、1 件でも残っていると下の
 -- `delete from tenants` が落ちる。そこで後片付けが止まると、次に実行した
@@ -1199,7 +1390,8 @@ update site_pages set is_published = false, published_revision_id = null
  where slug in ('verify-published', 'verify-draft');
 delete from site_pages where slug in ('verify-published', 'verify-draft');
 delete from audit_logs where action in ('verify.probe', '改ざん');
-delete from hq_members where user_id = '99999999-9999-9999-9999-999999999991';
+delete from hq_members where user_id in ('99999999-9999-9999-9999-999999999991',
+                                         '99999999-9999-9999-9999-999999999992');
 delete from tenants where id in ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1',
                                  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1',
                                  'cccccccc-cccc-cccc-cccc-ccccccccccc1');
