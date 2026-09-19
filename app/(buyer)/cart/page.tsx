@@ -114,12 +114,12 @@ function CartSection({ cart }: { cart: CartView }) {
 
       {cart.blockers.length > 0 ? (
         <Alert tone="error">{cart.blockers.join(" / ")}</Alert>
-      ) : null}
-
-      {/* 購入手続きはフェーズ3 の決済と一緒に入る。導線はまだ置かない */}
-      <p className="text-sm text-muted">
-        購入手続きは準備中です。決済の接続が終わり次第ご利用いただけます。
-      </p>
+      ) : (
+        // 進んだ先で届け先を選ぶと送料が確定する。決済はまだその先
+        <ButtonLink href={`/checkout/${cart.cartId}`} className="w-full sm:w-fit">
+          購入手続きに進む
+        </ButtonLink>
+      )}
     </section>
   );
 }

@@ -344,6 +344,61 @@ export type Database = {
         };
         Relationships: [];
       };
+      buyer_addresses: {
+        Row: {
+          id: string;
+          buyer_id: string;
+          recipient_name: string;
+          phone: string;
+          postal_code: string;
+          prefecture_code: string;
+          city: string;
+          address_line1: string;
+          address_line2: string | null;
+          is_default: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          buyer_id: string;
+          recipient_name: string;
+          phone: string;
+          postal_code: string;
+          prefecture_code: string;
+          city: string;
+          address_line1: string;
+          address_line2?: string | null;
+          is_default?: boolean;
+        };
+        Update: {
+          recipient_name?: string;
+          phone?: string;
+          postal_code?: string;
+          prefecture_code?: string;
+          city?: string;
+          address_line1?: string;
+          address_line2?: string | null;
+          is_default?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      inventory_reservations: {
+        Row: {
+          id: string;
+          variant_id: string;
+          cart_id: string | null;
+          order_id: string | null;
+          quantity: number;
+          expires_at: string;
+          released_at: string | null;
+          created_at: string;
+        };
+        // 書き込みは 0011 の関数（service_role）だけ。RLS 有効・ポリシー無し
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       carts: {
         Row: {
           id: string;

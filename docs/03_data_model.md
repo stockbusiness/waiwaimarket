@@ -30,6 +30,8 @@
 
 • inventory_reservations：購入手続き中の引当（有効期限付き。TTL 15分）。RLS 有効・ポリシーなしで、引当と解放は 0011 の関数を service_role から呼ぶ経路のみ
 
+• buyer_addresses：購入者の配送先（docs/00 5.1「配送先登録」）。宛名、電話番号、郵便番号、都道府県、市区町村、番地、建物名、既定フラグ。都道府県は 0012 の地域別送料と同じ JIS X 0401 の 2 桁コード（名前で持つと表記ゆれで送料の突き合わせが外れる）。郵便番号はハイフン無しの 7 桁で統一し、全角の直しはアプリ側で行う。既定は 1 人 1 件で、0013 の部分一意索引が 2 件目を拒否する。RLS は本人のみで、テナントも本部も読めない
+
 • carts / cart_items：カート。購入者ごと・テナントごとに1つ（0003 の一意索引）。カート投入時には在庫を引き当てない
 
 • shipping_profiles：送料・配送地域・発送日数。地域別送料は region_rules（jsonb）に次の形で持つ。0012 の検査制約（`shipping_profiles_region_rules_shape`）が形を守る
@@ -53,7 +55,13 @@
 　テナントは基本送料に織り込む。将来入れるときは version 2 とし、version 1 の
 　行はそのまま読めるようにする。
 
-• orders：注文親情報
+• orders：注文親情報。shipping_address（jsonb）は注文時点の配送先を**写し取る**。buyer_addresses への外部キーにはしない。購入者が後から住所を直したり消したりしても、「どこへ送った注文か」が変わってはいけないため。形は 0013 の検査制約（`orders_shipping_address_shape`）が守る
+
+```json
+{ "version": 1, "recipientName": "山田 太郎", "phone": "09012345678",
+  "postalCode": "1500001", "prefectureCode": "13", "city": "渋谷区",
+  "addressLine1": "神宮前 1-2-3", "addressLine2": "ビル 501" }
+```
 
 • order_items：注文明細
 
