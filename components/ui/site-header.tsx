@@ -11,18 +11,31 @@ import { ButtonLink } from "./button";
  */
 
 /**
- * ロゴ。
+ * ロゴ（2026-09-19 に正式データへ差し替え）。
  *
- * **画像ではなく文字で出している。** ロゴ画像の正式データ（背景が透明な SVG）が
- * まだ無いため。JPG をそのまま置くと白い四角が背景に残り、暗い面で浮く。
- * データが届いたら `img` に差し替える（高さは 56px の枠に収める）。
+ * **高さ 40px を下回らせない。** 32px にするとロゴ内の「ワイワイマーケット」が
+ * 潰れて読めなくなる（Chromium で実測）。ヘッダーの枠は 56px なので収まる。
  *
- * 文言は日本語表記で固定する（app/layout.tsx のコメント参照）。
+ * `next/image` を使わない。SVG は最適化の対象外で、`width`/`height` を
+ * 要求されるだけになる。比率は 1800:620 で固定なので `h-10 w-auto` で足りる。
+ *
+ * **紺地に置かないこと。** 文字と W がロゴの紺（#073B82）なので、フッターの
+ * 紺地に載せると溶けて読めない。白抜き版はまだ無い。
+ *
+ * `alt` は日本語表記にする。読み上げで「waiwaimarket」と綴られても
+ * 伝わらない（app/layout.tsx のコメントと同じ方針）。
  */
 function Logo({ href }: { href: string }) {
   return (
-    <Link href={href} className="rounded-sm text-lg font-bold tracking-tight">
-      ワイワイマーケット
+    <Link href={href} className="rounded-sm">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/logo.svg"
+        alt="ワイワイマーケット"
+        width={1800}
+        height={620}
+        className="h-10 w-auto"
+      />
     </Link>
   );
 }
@@ -44,33 +57,31 @@ function Bar({ children }: { children: ReactNode }) {
 export function BuyerHeader() {
   return (
     <Bar>
-      <div className="flex h-14 items-center justify-between gap-4">
+      {/*
+        **高さを固定せず、折り返しを許す。** 文字ロゴのときは h-14 に
+        4 つの導線が収まっていたが、画像ロゴは 116px あり、390px の画面では
+        入りきらない。`flex-wrap` を付けずに詰めると「カート」が
+        「カー／ト」と語の途中で割れる（Chromium で実測）。
+        狭いときは導線の一群がまるごと次の行へ落ちる。
+      */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
         <Logo href="/" />
-        <div className="flex items-center gap-4">
-          <Link
-            href="/cart"
-            className="rounded-sm text-sm font-medium text-muted hover:text-body"
-          >
-            カート
-          </Link>
-          <Link
-            href="/orders"
-            className="rounded-sm text-sm font-medium text-muted hover:text-body"
-          >
-            注文履歴
-          </Link>
-          <Link
-            href="/inquiries"
-            className="rounded-sm text-sm font-medium text-muted hover:text-body"
-          >
-            問い合わせ
-          </Link>
-          <Link
-            href="/login"
-            className="rounded-sm text-sm font-medium text-muted hover:text-body"
-          >
-            ログイン
-          </Link>
+        {/* 各項目が割れないよう whitespace-nowrap。折り返すのは項目の境目だけ */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          {[
+            { href: "/cart", label: "カート" },
+            { href: "/orders", label: "注文履歴" },
+            { href: "/inquiries", label: "問い合わせ" },
+            { href: "/login", label: "ログイン" },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="rounded-sm text-sm font-medium whitespace-nowrap text-muted hover:text-body"
+            >
+              {item.label}
+            </Link>
+          ))}
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3 pb-3">
@@ -104,7 +115,9 @@ export function ConsoleHeader({
   return (
     <Bar>
       <div className="flex h-14 items-center justify-between gap-4">
-        <div className="flex items-baseline gap-2 overflow-hidden">
+        {/* 文字ロゴのときは items-baseline で揃えていたが、画像の
+            ベースラインは下端なので、面の名前が下にずれる。中央で揃える */}
+        <div className="flex items-center gap-2 overflow-hidden">
           <Logo href={home} />
           <span className="shrink-0 text-xs font-medium text-muted">{label}</span>
         </div>
