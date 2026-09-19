@@ -40,6 +40,7 @@ async function act(
       variantCount: loaded.product.variants.length,
       imageCount: loaded.product.images.length,
       hasCategory: loaded.product.categoryId !== null,
+      pricingMode: loaded.product.pricingMode,
     });
     if (blockers.length > 0) {
       return Response.json({ error: { reason: "blocked", blockers } }, { status: 409 });

@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { ProductStatus } from "@/lib/supabase/database.types";
+import type { ProductPricingMode, ProductStatus } from "@/lib/supabase/database.types";
 import type { MarketSupabaseClient } from "@/lib/supabase/server";
 import type { ProductBodyInput, VariantInput } from "@/lib/validation/product";
 
@@ -38,6 +38,7 @@ export type ProductDetail = {
   title: string;
   description: string | null;
   categoryId: string | null;
+  pricingMode: ProductPricingMode;
   status: ProductStatus;
   reviewNote: string | null;
   reviewedAt: string | null;
@@ -90,7 +91,7 @@ export async function getProduct(
   const { data: product, error } = await client
     .from("products")
     .select(
-      "id, tenant_id, title, description, category_id, status, review_note, reviewed_at",
+      "id, tenant_id, title, description, category_id, pricing_mode, status, review_note, reviewed_at",
     )
     .eq("id", productId)
     .maybeSingle();
@@ -120,6 +121,7 @@ export async function getProduct(
     title: product.title,
     description: product.description,
     categoryId: product.category_id,
+    pricingMode: product.pricing_mode,
     status: product.status,
     reviewNote: product.review_note,
     reviewedAt: product.reviewed_at,
@@ -156,6 +158,7 @@ export async function createProduct(
       title: params.input.title,
       description: params.input.description ?? null,
       category_id: params.input.categoryId,
+      pricing_mode: params.input.pricingMode,
     })
     .select("id")
     .single();
@@ -183,6 +186,9 @@ export async function updateProductBody(
       title: params.input.title,
       description: params.input.description ?? null,
       category_id: params.input.categoryId,
+      // 販売形態も本文のうち。公開中の「1,000円」を「価格はお問い合わせ
+      // ください」へ黙って差し替えられると、承認した内容と見え方が変わる
+      pricing_mode: params.input.pricingMode,
       ...(resetToReview ? { status: "submitted" as const } : {}),
     })
     .eq("id", params.productId)

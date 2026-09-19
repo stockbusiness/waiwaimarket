@@ -33,7 +33,7 @@ export default async function TenantProductNewPage() {
       <ProductForm
         tenantId={membership.tenantId}
         categories={categories}
-        initial={{ title: "", description: "", categoryId: null }}
+        initial={{ title: "", description: "", categoryId: null, pricingMode: "fixed" }}
         warnsReReview={false}
       />
     </PageShell>

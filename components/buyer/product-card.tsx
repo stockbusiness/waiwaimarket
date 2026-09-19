@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { formatPriceRange } from "@/lib/products/price";
+import { formatPriceFor } from "@/lib/products/price";
 import type { ProductListItem } from "@/lib/products/public";
 
 /**
@@ -10,6 +10,10 @@ import type { ProductListItem } from "@/lib/products/public";
  * 商品名だけをリンクにはしない。
  */
 export function ProductCard({ product }: { product: ProductListItem }) {
+  // 価格未定の商品に「在庫なし」を出さない（0014）。SKU を持たないので
+  // inStock は偽になるが、在庫の話をする段階に無い
+  const inquiryOnly = product.pricingMode === "inquiry";
+
   return (
     // h-full と w-full を明示する。これが無いと a が内容の幅に縮み、
     // 画像のある札だけ img に押し広げられて、画像の無い札が細くなる
@@ -34,7 +38,7 @@ export function ProductCard({ product }: { product: ProductListItem }) {
           </span>
         )}
 
-        {product.inStock ? null : (
+        {inquiryOnly || product.inStock ? null : (
           <span className="absolute inset-x-0 bottom-0 bg-body/80 py-1 text-center text-xs font-bold text-surface">
             在庫なし
           </span>
@@ -48,7 +52,9 @@ export function ProductCard({ product }: { product: ProductListItem }) {
         {product.storeName ? (
           <span className="truncate text-xs text-muted">{product.storeName}</span>
         ) : null}
-        <span className="text-sm font-bold">{formatPriceRange(product.price)}</span>
+        <span className={`text-sm font-bold ${inquiryOnly ? "text-muted" : ""}`}>
+          {formatPriceFor(product.pricingMode, product.price)}
+        </span>
       </div>
     </Link>
   );

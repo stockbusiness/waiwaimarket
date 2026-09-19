@@ -95,7 +95,7 @@ export default async function AdminProductReviewPage({
             </div>
             <div className="flex flex-col gap-1">
               <dt className="text-muted">説明</dt>
-              <dd className="whitespace-pre-wrap leading-7">
+              <dd className="break-words whitespace-pre-wrap leading-7">
                 {product.description || "（未入力）"}
               </dd>
             </div>

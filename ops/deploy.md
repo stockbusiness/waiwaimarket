@@ -57,7 +57,7 @@
    npx supabase db push
    ```
 
-   `0001_init.sql` から `0013_buyer_addresses.sql` までが順に流れる。
+   `0001_init.sql` から `0014_product_inquiries.sql` までが順に流れる。
    `0003` の check 制約と `0006` の外部キーは既存行を検証するので、
    **空のプロジェクトに適用すること。**
 
@@ -91,6 +91,19 @@
 
    `0013` が作る `is_valid_shipping_address()` の実行権限も**剥がさないこと。**
    `0012` と同じ理由で、剥がすと注文の作成が落ちる。
+
+   `0014` は `products.pricing_mode` を既定 `fixed` で足す。既存の商品は
+   これまでどおり通常販売のまま。値の入れ替えは起きない。
+
+   `0014` が作る `is_inquiry_only_variant()` の実行権限も**剥がさないこと。**
+   トリガの本体は書き込みを行うロールの権限で走るため、剥がすと購入者の
+   カート投入が `permission denied for function` で落ちる（ローカルで実測）。
+   一方 `create_product_inquiry()` は anon から剥がしてある（購入者本人が
+   呼ぶので authenticated には必要）。
+
+   `0014` から `product_inquiry_messages` が追記専用になる。検証用の行を
+   消したいときはトリガを一時的に止めるしかない（`supabase/tests/
+   verify_permissions.sql` の後片付けがそうしている）。**本番では行わないこと。**
 
    `0008` の Storage ポリシーは `storage.objects` の所有者の都合で SQL Editor から
    作れない可能性を懸念していたが、実プロジェクトでは問題なく作成できた。

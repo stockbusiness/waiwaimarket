@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { ProductPricingMode } from "@/lib/supabase/database.types";
 import { supabaseUrl } from "@/lib/supabase/env";
 import { createSupabaseServerClient, type MarketSupabaseClient } from "@/lib/supabase/server";
 
@@ -43,6 +44,8 @@ export type ProductListItem = {
   storeName: string | null;
   imageUrl: string | null;
   price: PriceRange | null;
+  /** 価格の出し方を決める。inquiry のとき price は当てにしない（0014） */
+  pricingMode: ProductPricingMode;
   inStock: boolean;
 };
 
@@ -190,7 +193,7 @@ export async function listPublicProducts(
 
   let builder = supabase
     .from("products")
-    .select("id, title, tenant_id, created_at", { count: "exact" });
+    .select("id, title, tenant_id, pricing_mode, created_at", { count: "exact" });
 
   if (query.category) {
     // カテゴリーは slug で受けるので id に引き直す。見つからなければ
@@ -250,6 +253,7 @@ export async function listPublicProducts(
         storeName: store?.displayName ?? null,
         imageUrl: covers.get(row.id) ?? null,
         price: priceRange(rowVariants),
+        pricingMode: row.pricing_mode,
         inStock: isInStock(rowVariants),
       };
     }),
@@ -267,6 +271,7 @@ export type PublicProductDetail = {
   categorySlug: string | null;
   storeSlug: string | null;
   storeName: string | null;
+  pricingMode: ProductPricingMode;
   images: { id: string; url: string }[];
   variants: {
     id: string;
@@ -288,7 +293,7 @@ export async function getPublicProduct(id: string): Promise<PublicProductDetail 
 
   const { data: product, error } = await supabase
     .from("products")
-    .select("id, title, description, tenant_id, category_id")
+    .select("id, title, description, tenant_id, category_id, pricing_mode")
     .eq("id", id)
     .maybeSingle();
 
@@ -326,6 +331,7 @@ export async function getPublicProduct(id: string): Promise<PublicProductDetail 
     categorySlug: category?.slug ?? null,
     storeSlug: store?.slug ?? null,
     storeName: store?.displayName ?? null,
+    pricingMode: product.pricing_mode,
     images: (imageResult.data ?? []).map((image) => ({
       id: image.id,
       url: productImageUrl(image.storage_path),

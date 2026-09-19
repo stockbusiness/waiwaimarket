@@ -38,6 +38,7 @@ export default async function TenantProductEditPage({
     variantCount: product.variants.length,
     imageCount: product.images.length,
     hasCategory: product.categoryId !== null,
+    pricingMode: product.pricingMode,
   });
 
   return (
@@ -87,6 +88,7 @@ export default async function TenantProductEditPage({
             title: product.title,
             description: product.description ?? "",
             categoryId: product.categoryId,
+            pricingMode: product.pricingMode,
           }}
           warnsReReview={bodyChangeResetsReview(product.status)}
         />
@@ -107,6 +109,12 @@ export default async function TenantProductEditPage({
 
       <section className="flex flex-col gap-3">
         <SectionHeader title="SKU・価格・在庫" />
+        {product.pricingMode === "inquiry" ? (
+          <Alert tone="warning">
+            この商品は「価格は問い合わせで伝える」設定です。SKU を登録しても購入者には
+            表示されず、カートにも入れられません。審査にも SKU は必要ありません。
+          </Alert>
+        ) : null}
         <VariantEditor
           productId={product.id}
           initial={product.variants.map((variant) => ({

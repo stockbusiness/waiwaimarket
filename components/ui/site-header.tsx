@@ -54,6 +54,12 @@ export function BuyerHeader() {
             カート
           </Link>
           <Link
+            href="/inquiries"
+            className="rounded-sm text-sm font-medium text-muted hover:text-body"
+          >
+            問い合わせ
+          </Link>
+          <Link
             href="/login"
             className="rounded-sm text-sm font-medium text-muted hover:text-body"
           >

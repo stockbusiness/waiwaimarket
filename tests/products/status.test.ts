@@ -112,9 +112,14 @@ describe("本文の変更で審査に戻す", () => {
 
 describe("審査に出せない理由", () => {
   it("SKU・画像・カテゴリーが揃っていれば空", () => {
-    expect(submitBlockers({ variantCount: 1, imageCount: 1, hasCategory: true })).toEqual(
-      [],
-    );
+    expect(
+      submitBlockers({
+        variantCount: 1,
+        imageCount: 1,
+        hasCategory: true,
+        pricingMode: "fixed",
+      }),
+    ).toEqual([]);
   });
 
   it("足りないものを全部返す（1 つ直すたびに出し直させない）", () => {
@@ -122,10 +127,35 @@ describe("審査に出せない理由", () => {
       variantCount: 0,
       imageCount: 0,
       hasCategory: false,
+      pricingMode: "fixed",
     });
     expect(blockers).toHaveLength(3);
     expect(blockers.join()).toContain("SKU");
     expect(blockers.join()).toContain("画像");
     expect(blockers.join()).toContain("カテゴリー");
+  });
+
+  it("問い合わせのみの商品には SKU を求めない（0014）", () => {
+    // 価格が決まっていないから問い合わせにしているのに、0 円の SKU を
+    // 作らせるのは形だけの手続きで、その 0 円が別の画面で「無料」に
+    // 見える元になる
+    const blockers = submitBlockers({
+      variantCount: 0,
+      imageCount: 1,
+      hasCategory: true,
+      pricingMode: "inquiry",
+    });
+    expect(blockers).toEqual([]);
+  });
+
+  it("問い合わせのみでも画像とカテゴリーは要る", () => {
+    const blockers = submitBlockers({
+      variantCount: 0,
+      imageCount: 0,
+      hasCategory: false,
+      pricingMode: "inquiry",
+    });
+    expect(blockers).toHaveLength(2);
+    expect(blockers.join()).not.toContain("SKU");
   });
 });
