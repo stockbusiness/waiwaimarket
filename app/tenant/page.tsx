@@ -4,6 +4,7 @@ import { Card, PageHeader, PageShell } from "@/components/ui/page";
 import { requireTenantUser } from "@/lib/auth/guard";
 import { withPageGuard } from "@/lib/auth/page-guard";
 import { countOpenInquiries } from "@/lib/inquiries/store";
+import { countAwaitingShipment } from "@/lib/orders/store";
 import type { TenantStatus } from "@/lib/supabase/database.types";
 
 export const metadata = { title: "テナント管理" };
@@ -50,6 +51,16 @@ export default async function TenantHome() {
     ),
   );
 
+  // 発送待ち（決済済み・未発送）の件数。放置されると購入者を待たせる
+  const shipmentCounts = new Map(
+    await Promise.all(
+      (tenants ?? []).map(
+        async (tenant) =>
+          [tenant.id, await countAwaitingShipment(context.client, tenant.id)] as const,
+      ),
+    ),
+  );
+
   return (
     <PageShell>
       <PageHeader
@@ -83,6 +94,10 @@ export default async function TenantHome() {
                       <dd>{stripeDone ? "完了" : "未完了"}</dd>
                     </div>
                     <div className="flex gap-2">
+                      <dt className="text-muted">発送待ち</dt>
+                      <dd>{shipmentCounts.get(tenant.id) ?? 0} 件</dd>
+                    </div>
+                    <div className="flex gap-2">
                       <dt className="text-muted">未回答の問い合わせ</dt>
                       <dd>{openCounts.get(tenant.id) ?? 0} 件</dd>
                     </div>
@@ -92,6 +107,7 @@ export default async function TenantHome() {
                     {isOwner && !stripeDone ? (
                       <TextLink href="/tenant/onboarding">Stripe の手続きへ</TextLink>
                     ) : null}
+                    <TextLink href="/tenant/orders">受注</TextLink>
                     <TextLink href="/tenant/products">商品</TextLink>
                     <TextLink href="/tenant/inquiries">問い合わせ</TextLink>
                     <TextLink href="/tenant/settings/shipping">送料設定</TextLink>

@@ -57,7 +57,7 @@
    npx supabase db push
    ```
 
-   `0001_init.sql` から `0014_product_inquiries.sql` までが順に流れる。
+   `0001_init.sql` から `0015_order_writes.sql` までが順に流れる。
    `0003` の check 制約と `0006` の外部キーは既存行を検証するので、
    **空のプロジェクトに適用すること。**
 
@@ -104,6 +104,20 @@
    `0014` から `product_inquiry_messages` が追記専用になる。検証用の行を
    消したいときはトリガを一時的に止めるしかない（`supabase/tests/
    verify_permissions.sql` の後片付けがそうしている）。**本番では行わないこと。**
+
+   `0015` は注文の書き込みを開く。既存行は触らない（注文は 0 件のはず）。
+
+   `0015` が作る `ship_order()` の実行権限は**剥がさないこと。**
+   テナント自身が呼ぶため、剥がすと発送登録が
+   `permission denied for function` で落ちる（`0012` と同じ事情）。
+   一方 `attach_reservations_to_order()` / `release_order_reservations()` /
+   `expire_pending_orders()` は service_role 限定で、剥がしてあるのが正しい
+   （`0011` の引当関数と同じ扱い）。
+
+   **`0015` から引当解放バッチの役割が増える。** 期限切れの引当を解放した
+   あと、確保が切れた「決済待ち」の注文を取消にする。Cron の設定
+   （`vercel.json`）は変わらないが、`CRON_SECRET` が未設定だと注文が
+   決済待ちのまま溜まり続けるので、**必ず設定すること。**
 
    `0008` の Storage ポリシーは `storage.objects` の所有者の都合で SQL Editor から
    作れない可能性を懸念していたが、実プロジェクトでは問題なく作成できた。

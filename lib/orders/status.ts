@@ -92,6 +92,11 @@ export function isOrderAction(value: string): value is OrderAction {
   return (ORDER_ACTIONS as readonly string[]).includes(value);
 }
 
+/** 一覧の絞り込みを URL のクエリで受けるので、知らない値が来る前提で見る */
+export function isOrderStatus(value: string): value is OrderStatus {
+  return Object.prototype.hasOwnProperty.call(ORDER_STATUS_LABEL, value);
+}
+
 export function canTransition(from: OrderStatus, action: OrderAction): boolean {
   return TRANSITIONS[action].from.includes(from);
 }

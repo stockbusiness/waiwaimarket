@@ -441,6 +441,110 @@ export type Database = {
         };
         Relationships: [];
       };
+      orders: {
+        Row: {
+          id: string;
+          order_number: string;
+          buyer_id: string;
+          tenant_id: string;
+          status: OrderStatus;
+          subtotal_incl_tax: number;
+          shipping_fee: number;
+          point_discount: number;
+          total_charged: number;
+          point_rule_snapshot: Json;
+          shipping_address: Json;
+          placed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        /**
+         * 作るのはサーバー処理だけ（0015 に insert のポリシーを置いていない）。
+         * 金額を決めるのはサーバーであって購入者ではない。
+         */
+        Insert: {
+          order_number: string;
+          buyer_id: string;
+          tenant_id: string;
+          status?: OrderStatus;
+          subtotal_incl_tax: number;
+          shipping_fee?: number;
+          point_discount?: number;
+          total_charged: number;
+          point_rule_snapshot?: Json;
+          shipping_address: Json;
+          placed_at?: string | null;
+        };
+        /**
+         * 型では `status` 以外も書ける形にしてある。サーバー処理
+         * （注文の作成・決済の確定）が同じ型を通るため。
+         *
+         * テナントを止めているのは型ではなく 0015 の
+         * `orders_guard_columns()`。金額・配送先・ポイントルールの変更は
+         * 例外になる（products の審査列と同じ関係）。
+         */
+        Update: {
+          status?: OrderStatus;
+          point_discount?: number;
+          total_charged?: number;
+          point_rule_snapshot?: Json;
+          placed_at?: string | null;
+        };
+        Relationships: [];
+      };
+      order_items: {
+        Row: {
+          id: string;
+          order_id: string;
+          variant_id: string;
+          product_title: string;
+          unit_price_incl_tax: number;
+          quantity: number;
+          line_total_incl_tax: number;
+          point_eligible_amount: number;
+          allocated_point_discount: number;
+          refunded_quantity: number;
+        };
+        Insert: {
+          order_id: string;
+          variant_id: string;
+          /** 注文時点の名称を写し取る。商品が改名されても変わらない */
+          product_title: string;
+          unit_price_incl_tax: number;
+          quantity: number;
+          line_total_incl_tax: number;
+          point_eligible_amount: number;
+          allocated_point_discount?: number;
+        };
+        /** 返品でしか動かない。数量と金額は注文時点のまま */
+        Update: {
+          refunded_quantity?: number;
+          allocated_point_discount?: number;
+        };
+        Relationships: [];
+      };
+      shipments: {
+        Row: {
+          id: string;
+          order_id: string;
+          carrier: string | null;
+          tracking_number: string | null;
+          /** ポイント確定（発送登録日＋14日）の起点（docs/02 6.1） */
+          shipped_at: string;
+          created_at: string;
+        };
+        Insert: {
+          order_id: string;
+          carrier?: string | null;
+          tracking_number?: string | null;
+          shipped_at: string;
+        };
+        Update: {
+          carrier?: string | null;
+          tracking_number?: string | null;
+        };
+        Relationships: [];
+      };
       shipping_profiles: {
         Row: {
           id: string;
@@ -604,6 +708,31 @@ export type Database = {
       create_product_inquiry: {
         Args: { p_product_id: string; p_body: string };
         Returns: string;
+      };
+      /**
+       * 発送登録（0015）。状態（paid→shipped）と shipments の記録を
+       * まとめて書く。動かせなければ false。
+       *
+       * invoker なので RLS がそのまま効く（自店の注文だけ）。
+       */
+      ship_order: {
+        Args: { p_order_id: string; p_carrier?: string | null; p_tracking?: string | null };
+        Returns: boolean;
+      };
+      /** カートの引当を注文へ移す（0015）。付け替えた件数を返す */
+      attach_reservations_to_order: {
+        Args: { p_cart_id: string; p_order_id: string };
+        Returns: number;
+      };
+      /** 注文の引当をまとめて解放する（0015）。二重に呼んでも戻し過ぎない */
+      release_order_reservations: {
+        Args: { p_order_id: string };
+        Returns: number;
+      };
+      /** 有効な引当が残っていない決済待ちを取消にする（0015）。冪等 */
+      expire_pending_orders: {
+        Args: Record<string, never>;
+        Returns: number;
       };
       /** 期限切れをまとめて解放し、件数を返す。冪等 */
       release_expired_reservations: {

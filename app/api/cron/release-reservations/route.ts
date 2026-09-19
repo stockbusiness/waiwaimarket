@@ -3,10 +3,15 @@ import type { NextRequest } from "next/server";
 import { checkCronAuth } from "@/lib/http/cron-auth";
 import { apiErrorResponse } from "@/lib/http/errors";
 import { releaseExpiredReservations } from "@/lib/inventory/reserve";
+import { expirePendingOrders } from "@/lib/orders/transition";
 
 /**
  * 期限切れの在庫引当を解放するバッチ（docs/06 4.2「期限切れの引当は
  * 自動解放する」）。Vercel Cron から呼ぶ。
+ *
+ * **確保が切れた決済待ちの注文を畳むところまで行う**（0015、2026-09-19 決定）。
+ * 別の Cron に分けないのは、畳む判定が引当の有無で決まるため。2 本に
+ * 分けると実行の間隔ぶんだけ判定がずれ、順序も保証できない。
  *
  * 経路が `/api/cron/...` なのは、購入者面の cookie（path `/`）の配下で
  * よいため。Cron はそもそも cookie を送らず、`Authorization: Bearer` の
@@ -51,11 +56,17 @@ async function run(request: NextRequest): Promise<Response> {
     }
 
     const released = await releaseExpiredReservations();
+
+    // **解放したあとに畳む。** 判定が「有効な引当が 1 つも無いこと」
+    // （0015）なので、順序を逆にすると、この回で切れた引当がまだ有効に
+    // 見えて、畳むのが次の実行まで 1 周遅れる
+    const cancelled = await expirePendingOrders();
+
     // 件数をログに残す。0 が続くのは正常だが、常に大きい値が出るなら
     // 購入手続きの離脱が多いということなので、運用で気づけるようにする
-    console.info("引当解放バッチ", { released });
+    console.info("引当解放バッチ", { released, cancelled });
 
-    return Response.json({ released });
+    return Response.json({ released, cancelled });
   } catch (error) {
     return apiErrorResponse(error, "引当の解放に失敗しました");
   }
