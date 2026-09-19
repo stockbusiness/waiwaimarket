@@ -56,6 +56,30 @@ export async function releaseReservation(reservationId: string): Promise<boolean
 }
 
 /**
+ * 引当のうち最も早い有効期限を返す。1 件も無ければ null。
+ *
+ * **期限をアプリ側で足し算しない。** 実際の `expires_at` は 0003 の既定値
+ * （`now() + interval '15 minutes'`）が入れる。画面に出す残り時間は必ず
+ * この値から出すこと。両方で計算すると、片方だけ直したときに案内と実際の
+ * 期限がずれる（lib/inventory/ttl.ts のコメントと同じ理由）。
+ */
+export async function earliestExpiry(reservationIds: string[]): Promise<string | null> {
+  if (reservationIds.length === 0) return null;
+  const service = createSupabaseServiceClient();
+
+  const { data, error } = await service
+    .from("inventory_reservations")
+    .select("expires_at")
+    .in("id", reservationIds)
+    .order("expires_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.expires_at ?? null;
+}
+
+/**
  * 期限切れをまとめて解放する。解放した件数を返す。
  *
  * 冪等なので、何度実行しても結果は変わらない。

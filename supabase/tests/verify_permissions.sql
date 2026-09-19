@@ -772,9 +772,126 @@ select '正しい地域別送料は保存できる', '通過', current_setting('
        case when current_setting('verify.v') = '通過' then 'PASS' else 'FAIL' end;
 
 -- ------------------------------------------------------------
+-- 配送先住所（0013）
+-- ------------------------------------------------------------
+reset role;
+insert into buyer_addresses (id, buyer_id, recipient_name, phone, postal_code,
+                             prefecture_code, city, address_line1, is_default)
+values ('a0000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000001',
+        '検証 太郎', '09011112222', '1500001', '13', '渋谷区', '神宮前 1-1', true),
+       ('a0000000-0000-4000-8000-00000000000b', '00000000-0000-4000-8000-000000000002',
+        '検証 花子', '09033334444', '9000001', '47', '那覇市', 'おもろまち 2-2', true);
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-4000-8000-000000000001';
+set request.jwt.claims = '{"role":"authenticated"}';
+select set_config('verify.v', (select count(*)::text from buyer_addresses), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '購入者は自分の配送先だけ読める', '1', current_setting('verify.v'),
+       case when current_setting('verify.v') = '1' then 'PASS' else 'FAIL' end;
+
+-- 他人の配送先を書き換えられない。住所は本人以外に触らせない
+set role authenticated;
+update buyer_addresses set city = '改ざん'
+ where id = 'a0000000-0000-4000-8000-00000000000b';
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '他人の配送先を書き換えられない', '0',
+       (select count(*)::text from buyer_addresses where city = '改ざん'),
+       case when (select count(*) from buyer_addresses where city = '改ざん') = 0
+            then 'PASS' else 'FAIL' end;
+
+-- 他人の buyer_id で登録できない（なりすまし）
+--
+-- **do ブロックの前に set role を置くこと。** reset role のまま実行すると
+-- 所有者（RLS を素通りする）として挿入することになり、ポリシーが正しくても
+-- 「通過」と出る。実際にこれで一度 FAIL を出した。
+set role authenticated;
+do $$
+begin
+  perform set_config('verify.v', '拒否', false);
+  insert into buyer_addresses (buyer_id, recipient_name, phone, postal_code,
+                               prefecture_code, city, address_line1)
+  values ('00000000-0000-4000-8000-000000000002', 'なりすまし', '09055556666',
+          '1500001', '13', '渋谷区', 'x');
+  perform set_config('verify.v', '通過', false);
+exception when others then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '他人の buyer_id で配送先を登録できない', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+-- 匿名からは 1 件も見えない
+set role anon;
+set request.jwt.claim.sub = '';
+set request.jwt.claims = '{"role":"anon"}';
+select set_config('verify.v', (select count(*)::text from buyer_addresses), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は配送先を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 既定の配送先は 1 人 1 件。アプリ側の順序ミスを索引が止める
+do $$
+begin
+  perform set_config('verify.v', '拒否', false);
+  insert into buyer_addresses (buyer_id, recipient_name, phone, postal_code,
+                               prefecture_code, city, address_line1, is_default)
+  values ('00000000-0000-4000-8000-000000000001', '2件目の既定', '09011115555',
+          '1000001', '13', '千代田区', '丸の内 1-1', true);
+  perform set_config('verify.v', '通過', false);
+exception when unique_violation then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+insert into _perm_results (item, expected, actual, verdict)
+select '既定の配送先を 2 件持てない', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+-- 注文へ写し取る形。0012 と同じく、壊れた形を DB が拒否する
+insert into _perm_results (item, expected, actual, verdict)
+select 'shipping_address の検査制約がある', '1',
+       (select count(*)::text from pg_constraint
+         where conname = 'orders_shipping_address_shape'),
+       case when (select count(*) from pg_constraint
+                   where conname = 'orders_shipping_address_shape') = 1
+            then 'PASS' else 'FAIL' end;
+
+insert into _perm_results (item, expected, actual, verdict)
+select '郵便番号がハイフン付きの配送先を拒否する', 'false',
+       is_valid_shipping_address('{"version":1,"recipientName":"山田","phone":"0312345678",
+         "postalCode":"150-0001","prefectureCode":"13","city":"渋谷区",
+         "addressLine1":"神宮前"}'::jsonb)::text,
+       case when not is_valid_shipping_address('{"version":1,"recipientName":"山田",
+         "phone":"0312345678","postalCode":"150-0001","prefectureCode":"13",
+         "city":"渋谷区","addressLine1":"神宮前"}'::jsonb)
+            then 'PASS' else 'FAIL' end;
+
+insert into _perm_results (item, expected, actual, verdict)
+select '正しい形の配送先は通る', 'true',
+       is_valid_shipping_address('{"version":1,"recipientName":"山田","phone":"0312345678",
+         "postalCode":"1500001","prefectureCode":"13","city":"渋谷区",
+         "addressLine1":"神宮前"}'::jsonb)::text,
+       case when is_valid_shipping_address('{"version":1,"recipientName":"山田",
+         "phone":"0312345678","postalCode":"1500001","prefectureCode":"13",
+         "city":"渋谷区","addressLine1":"神宮前"}'::jsonb)
+            then 'PASS' else 'FAIL' end;
+
+-- 0012 と同じ理由で剥がさない。剥がすと注文の作成が落ちる
+insert into _perm_results (item, expected, actual, verdict)
+select '配送先の検査関数の EXECUTE を剥がしていない', 'true',
+       has_function_privilege('authenticated', 'is_valid_shipping_address(jsonb)', 'execute')::text,
+       case when has_function_privilege('authenticated', 'is_valid_shipping_address(jsonb)', 'execute')
+            then 'PASS' else 'FAIL' end;
+
+-- ------------------------------------------------------------
 -- 後片付け
 -- ------------------------------------------------------------
 reset role;
+delete from buyer_addresses where buyer_id in ('00000000-0000-4000-8000-000000000001',
+                                               '00000000-0000-4000-8000-000000000002');
 delete from carts where id = 'c0000000-0000-4000-8000-00000000000a';
 delete from shipping_profiles where id = '50000000-0000-4000-8000-00000000000a';
 delete from product_categories where slug = 'verify-category';
