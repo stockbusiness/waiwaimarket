@@ -7,6 +7,8 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, TextArea, TextInput } from "@/components/ui/field";
 import { readApiError } from "@/lib/http/error-message";
+import { PRICING_MODE_LABEL } from "@/lib/products/status";
+import type { ProductPricingMode } from "@/lib/supabase/database.types";
 
 /**
  * 商品本体（表題・説明・カテゴリー）の入力。
@@ -23,7 +25,12 @@ type Props = {
   productId?: string;
   tenantId: string;
   categories: CategoryOption[];
-  initial: { title: string; description: string; categoryId: string | null };
+  initial: {
+    title: string;
+    description: string;
+    categoryId: string | null;
+    pricingMode: ProductPricingMode;
+  };
   /** 公開中の商品を直すと審査待ちへ戻る旨を出すか */
   warnsReReview: boolean;
 };
@@ -56,6 +63,7 @@ export function ProductForm({
       title: String(form.get("title") ?? ""),
       description: String(form.get("description") ?? ""),
       categoryId: categoryId === "" ? null : categoryId,
+      pricingMode: String(form.get("pricingMode") ?? "fixed"),
     };
 
     const response = await fetch(
@@ -126,9 +134,29 @@ export function ProductForm({
         </select>
       </Field>
 
+      <Field
+        label="販売形態"
+        hint={
+          "価格が決まっていない、または価格を掲載できない商品は「問い合わせ」にします。" +
+          "購入ボタンの代わりに問い合わせボタンが出て、カートには入れられなくなります。"
+        }
+      >
+        <select
+          name="pricingMode"
+          defaultValue={initial.pricingMode}
+          className={SELECT}
+        >
+          {(["fixed", "inquiry"] as const).map((mode) => (
+            <option key={mode} value={mode}>
+              {PRICING_MODE_LABEL[mode]}
+            </option>
+          ))}
+        </select>
+      </Field>
+
       {warnsReReview ? (
         <Alert tone="warning">
-          公開中の商品です。商品名・説明・カテゴリーを変更すると、もう一度審査に回ります。
+          公開中の商品です。商品名・説明・カテゴリー・販売形態を変更すると、もう一度審査に回ります。
           価格と在庫の変更では審査に戻りません。
         </Alert>
       ) : null}

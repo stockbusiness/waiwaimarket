@@ -49,6 +49,8 @@ export type CartLine = {
   exceedsStock: boolean;
   /** 販売停止・非公開になった商品。購入手続きに進めない */
   unavailable: boolean;
+  /** 価格未定（問い合わせのみ）に切り替わった商品。購入手続きに進めない */
+  inquiryOnly: boolean;
 };
 
 export type CartView = {
@@ -136,8 +138,10 @@ export async function listCarts(
         quantity: item.quantity,
         availableQuantity: available,
         exceedsStock: item.quantity > available,
-        // RLS で読めない＝公開されていない商品。販売停止や差戻しで起きる
-        unavailable: !variant,
+        // RLS で読めない＝公開されていない商品。販売停止や差戻しで起きる。
+        // 価格未定へ切り替えられた商品も、この場では買えない
+        unavailable: !variant || variant.inquiryOnly,
+        inquiryOnly: variant?.inquiryOnly ?? false,
       };
     });
 
@@ -154,8 +158,11 @@ export async function listCarts(
     const store = stores.get(cart.tenant_id);
 
     const blockers: string[] = [];
-    if (lines.some((row) => row.unavailable)) {
+    if (lines.some((row) => row.unavailable && !row.inquiryOnly)) {
       blockers.push("販売が終了した商品があります");
+    }
+    if (lines.some((row) => row.inquiryOnly)) {
+      blockers.push("価格が未定に変わり、この場では購入できない商品があります");
     }
     if (lines.some((row) => !row.unavailable && row.exceedsStock)) {
       blockers.push("在庫が足りない商品があります");
@@ -184,6 +191,8 @@ export async function listCarts(
 }
 
 type VariantInfo = {
+  /** 途中で「問い合わせのみ」へ切り替えられた商品（0014） */
+  inquiryOnly: boolean;
   productId: string;
   productTitle: string;
   optionLabel: string | null;
@@ -217,7 +226,7 @@ async function loadVariants(
 
   const productIds = [...new Set(rows.map((row) => row.product_id))];
   const [products, inventories, images] = await Promise.all([
-    client.from("products").select("id, title").in("id", productIds),
+    client.from("products").select("id, title, pricing_mode").in("id", productIds),
     client
       .from("inventories")
       .select("variant_id, quantity, reserved_quantity")
@@ -237,6 +246,12 @@ async function loadVariants(
   if (images.error) throw images.error;
 
   const titleById = new Map((products.data ?? []).map((row) => [row.id, row.title]));
+  // 途中で「問い合わせのみ」へ切り替えられた商品。0014 のトリガが新しい
+  // 投入は拒むが、切り替え前から入っていた行はカートに残る。価格が
+  // 決まっていないものを 0 円で通すわけにはいかないので、ここで外す
+  const inquiryOnly = new Set(
+    (products.data ?? []).filter((row) => row.pricing_mode === "inquiry").map((row) => row.id),
+  );
   const stockById = new Map(
     (inventories.data ?? []).map((row) => [
       row.variant_id,
@@ -253,6 +268,7 @@ async function loadVariants(
   for (const row of rows) {
     const stock = stockById.get(row.id);
     map.set(row.id, {
+      inquiryOnly: inquiryOnly.has(row.product_id),
       productId: row.product_id,
       productTitle: titleById.get(row.product_id) ?? "（不明な商品）",
       optionLabel: row.option_label,
@@ -318,7 +334,10 @@ async function loadStores(
 
 export type CartWriteResult =
   | { ok: true; cartId: string }
-  | { ok: false; reason: "not_found" | "unavailable" | "invalid_quantity" };
+  | {
+      ok: false;
+      reason: "not_found" | "unavailable" | "invalid_quantity" | "inquiry_only";
+    };
 
 /**
  * カートへ入れる。同じ SKU が既にあれば数量を足す。
@@ -346,12 +365,17 @@ export async function addToCart(
 
   const { data: product, error: productError } = await client
     .from("products")
-    .select("tenant_id")
+    .select("tenant_id, pricing_mode")
     .eq("id", variant.product_id)
     .maybeSingle();
 
   if (productError) throw productError;
   if (!product) return { ok: false, reason: "unavailable" };
+
+  // 価格未定の商品は買えない（0014）。DB 側でも `cart_items_no_inquiry` が
+  // 拒否するが、そちらは例外になるので購入者に理由が伝わらない。
+  // 判定を 2 か所に置くのは、片方が抜けても売れてしまわないようにするため
+  if (product.pricing_mode === "inquiry") return { ok: false, reason: "inquiry_only" };
 
   const cartId = await ensureCart(client, params.buyerId, product.tenant_id);
 

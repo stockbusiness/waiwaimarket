@@ -1,4 +1,4 @@
-import type { ProductStatus } from "@/lib/supabase/database.types";
+import type { ProductPricingMode, ProductStatus } from "@/lib/supabase/database.types";
 
 /**
  * 商品の状態遷移（docs/00 5.3、docs/06 フェーズ2-2、
@@ -105,14 +105,27 @@ export function bodyChangeResetsReview(status: ProductStatus): boolean {
   return status === "approved";
 }
 
-/** 審査に出せる状態か（画面の説明文にも使う） */
+export const PRICING_MODE_LABEL: Record<ProductPricingMode, string> = {
+  fixed: "価格を表示して販売する",
+  inquiry: "価格は問い合わせで伝える",
+};
+
+/**
+ * 審査に出せる状態か（画面の説明文にも使う）。
+ *
+ * **問い合わせのみの商品には SKU を求めない。** 価格が決まっていないから
+ * 問い合わせにしているのに、0 円の SKU を 1 つ作らせるのは形だけの手続きで、
+ * しかもその 0 円が別の画面で「無料」に見える元になる。
+ * 画像とカテゴリーは変わらず必要（どの棚に置くかと、何の商品かは要る）。
+ */
 export function submitBlockers(input: {
   variantCount: number;
   imageCount: number;
   hasCategory: boolean;
+  pricingMode: ProductPricingMode;
 }): string[] {
   const blockers: string[] = [];
-  if (input.variantCount === 0) {
+  if (input.pricingMode === "fixed" && input.variantCount === 0) {
     blockers.push("SKU（価格と在庫）が 1 つも登録されていません");
   }
   if (input.imageCount === 0) {

@@ -20,7 +20,32 @@
 
 • product_categories：商品カテゴリー。親子関係、表示順、公開状態
 
-• products：商品基本情報。審査状態、審査実行者・日時、審査の所見（review_note。差戻しの理由をテナントへ伝える。本部のみが書ける）
+• products：商品基本情報。審査状態、審査実行者・日時、審査の所見（review_note。差戻しの理由をテナントへ伝える。本部のみが書ける）、販売形態（pricing_mode）
+
+　pricing_mode は `fixed`（通常販売）と `inquiry`（価格未定・非公開で問い合わせのみ）。
+　SKU 単位ではなく商品単位で持つ。同じ商品で「A は価格あり、B は要問い合わせ」という
+　売り方は、購入者から見て何が起きているのか分からないため。
+
+　`product_variants.price_incl_tax` は not null なので、価格未定の商品にも 0 が入る。
+　**0 円を「無料」と読み違えないよう、価格の表示は必ず pricing_mode で分岐する**
+　（`lib/products/price.ts` の `formatPriceFor()`）。`inquiry` の商品は 0014 の
+　トリガ（`cart_items_no_inquiry`）がカート投入を拒否し、審査の必須項目からも
+　SKU を外す。
+
+• product_inquiries：価格未定の商品への問い合わせ（スレッドの親）。商品、宛先テナント、購入者、状態（open / answered / closed）
+
+　宛先はテナント。本部は全件を読めるが書けない（2026-09-19 決定）。商品の価格を
+　答えられるのはテナントだけで、本部を一次受付にすると毎回転送が挟まる。本部にも
+　返信させると、どちらが答えるか決まっていない状態で二重返信が起きる。
+
+　tenant_id を商品から非正規化して持つ。RLS の判定で products を join すると
+　products 側の RLS も効いてしまう（0008 の罠）。商品は削除しない方針なので食い違わない。
+
+• product_inquiry_messages：問い合わせの発言。**追記専用。**発言者の区分（buyer / tenant）、発言者ID、本文（2000 文字まで、空白だけは不可）
+
+　後から書き換えられると、「何を答えたか」が争点になったときに記録の意味がなくなる。
+　point_ledger_entries と同じくトリガで update / delete / truncate を拒否する。
+　状態と更新日時は発言が入ったときにトリガが動かす（アプリから 2 回書かない）。
 
 • product_variants：サイズ・色・SKU・価格
 

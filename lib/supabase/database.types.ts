@@ -23,6 +23,14 @@ export type ProductStatus =
   | "approved"
   | "rejected"
   | "suspended";
+/**
+ * 販売形態（0014）。`inquiry` は価格未定・非公開で、問い合わせのみ受ける。
+ * `product_variants.price_incl_tax` は not null なので 0 が入るが、
+ * **0 円を「無料」と読み違えないよう、表示は必ずこの列で分岐する。**
+ */
+export type ProductPricingMode = "fixed" | "inquiry";
+export type InquiryStatus = "open" | "answered" | "closed";
+export type InquirySenderRole = "buyer" | "tenant";
 export type TenantMemberRole = "owner" | "staff";
 export type TenantStatus =
   | "applied"
@@ -248,6 +256,7 @@ export type Database = {
           title: string;
           description: string | null;
           category_id: string | null;
+          pricing_mode: ProductPricingMode;
           status: ProductStatus;
           reviewed_by: string | null;
           reviewed_at: string | null;
@@ -260,6 +269,7 @@ export type Database = {
           title: string;
           description?: string | null;
           category_id?: string | null;
+          pricing_mode?: ProductPricingMode;
           status?: ProductStatus;
         };
         /**
@@ -275,6 +285,7 @@ export type Database = {
           title?: string;
           description?: string | null;
           category_id?: string | null;
+          pricing_mode?: ProductPricingMode;
           status?: ProductStatus;
           reviewed_by?: string | null;
           reviewed_at?: string | null;
@@ -510,6 +521,55 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      product_inquiries: {
+        Row: {
+          id: string;
+          product_id: string;
+          tenant_id: string;
+          buyer_id: string;
+          status: InquiryStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          product_id: string;
+          tenant_id: string;
+          buyer_id: string;
+        };
+        /**
+         * 変えられるのは状態だけ。宛先・対象商品・購入者は 0014 の
+         * `inquiries_guard_columns()` が拒否する。型でも同じ形にしてあるが、
+         * 止めているのはトリガのほう（products の審査列と同じ関係）。
+         */
+        Update: {
+          status?: InquiryStatus;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      product_inquiry_messages: {
+        Row: {
+          id: string;
+          inquiry_id: string;
+          sender_role: InquirySenderRole;
+          sender_id: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          inquiry_id: string;
+          sender_role: InquirySenderRole;
+          sender_id: string;
+          body: string;
+        };
+        /**
+         * 追記専用。「何を答えたか」が争点になったときに記録の意味が
+         * なくなるため、既存の発言を直せる型を持たせない。
+         * 実際に止めているのは 0014 のトリガ。
+         */
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: {
@@ -534,6 +594,17 @@ export type Database = {
         Args: { p_reservation_id: string };
         Returns: boolean;
       };
+      /**
+       * 問い合わせのスレッドと 1 通目をまとめて作る（0014）。
+       *
+       * 購入者は `auth.uid()`、宛先は商品から決まる。引数に取らないのは、
+       * `security definer` で RLS を通らないため、引数にすると他人の名前で
+       * スレッドを立てられるから。
+       */
+      create_product_inquiry: {
+        Args: { p_product_id: string; p_body: string };
+        Returns: string;
+      };
       /** 期限切れをまとめて解放し、件数を返す。冪等 */
       release_expired_reservations: {
         Args: Record<string, never>;
@@ -544,6 +615,9 @@ export type Database = {
       hq_role: HqRole;
       tenant_status: TenantStatus;
       product_status: ProductStatus;
+      product_pricing_mode: ProductPricingMode;
+      inquiry_status: InquiryStatus;
+      inquiry_sender_role: InquirySenderRole;
       order_status: OrderStatus;
     };
     CompositeTypes: Record<never, never>;

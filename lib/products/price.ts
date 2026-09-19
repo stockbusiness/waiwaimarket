@@ -56,12 +56,34 @@ export function isInStock(variants: VariantForDisplay[]): boolean {
 
 const YEN = new Intl.NumberFormat("ja-JP");
 
+/**
+ * 問い合わせのみの商品に出す文言（0014）。
+ *
+ * **0 円と出さない。** `product_variants.price_incl_tax` は not null なので
+ * 価格未定の商品にも 0 が入っているが、それは「無料」ではない。表示は
+ * 必ず `pricing_mode` で分岐する。
+ */
+export const INQUIRY_PRICE_LABEL = "価格はお問い合わせください";
+
 /** 「1,980円」「1,980円〜」。円は税込（product_variants.price_incl_tax） */
 export function formatPriceRange(range: PriceRange | null): string {
   if (!range) return "価格未設定";
   return range.hasRange
     ? `${YEN.format(range.min)}円〜`
     : `${YEN.format(range.min)}円`;
+}
+
+/**
+ * 販売形態を見たうえでの価格表示。一覧・詳細・店舗ページはこれを通す。
+ *
+ * 呼び出し側で `mode === "inquiry" ? ... : formatPriceRange(...)` と書くと、
+ * 画面が増えるたびに書き漏れが起きる。判定を 1 か所に置く。
+ */
+export function formatPriceFor(
+  mode: "fixed" | "inquiry",
+  range: PriceRange | null,
+): string {
+  return mode === "inquiry" ? INQUIRY_PRICE_LABEL : formatPriceRange(range);
 }
 
 export function formatYen(value: number): string {

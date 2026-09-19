@@ -23,6 +23,18 @@ export const productBodySchema = z.object({
     .transform((value) => (value ? value : undefined)),
   /** 未選択は null。審査に出すときに必須になる（lib/products/status.ts） */
   categoryId: z.uuid().nullable(),
+
+  /**
+   * 販売形態（0014）。
+   *
+   * `inquiry` は価格が決まっていない、または価格を公開できない商品。
+   * 購入ボタンの代わりに問い合わせボタンを出す。省略は `fixed`。
+   * カート投入は 0014 のトリガが DB 側でも拒否する。
+   */
+  pricingMode: z
+    .enum(["fixed", "inquiry"])
+    .optional()
+    .transform((value) => value ?? "fixed"),
 });
 
 export type ProductBodyInput = z.infer<typeof productBodySchema>;

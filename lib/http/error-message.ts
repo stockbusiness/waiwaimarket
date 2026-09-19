@@ -47,6 +47,13 @@ export async function readApiError(
       return "対象が見つかりませんでした。";
     case "invalid_transition":
       return "現在の状態では実行できない操作です。";
+    // 0014 の問い合わせ
+    case "inquiry_only":
+      return "この商品は価格が未定のため、カートに入れられません。お問い合わせからご相談ください。";
+    case "not_inquiry_product":
+      return "この商品は問い合わせを受け付けていません。";
+    case "closed":
+      return "この問い合わせは完了しています。新しくお問い合わせください。";
     case "unauthenticated":
       return "ログインの有効期限が切れています。再度ログインしてください。";
     case "mfa_required":

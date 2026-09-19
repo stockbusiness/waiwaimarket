@@ -29,6 +29,8 @@ export type CartLineView = {
   availableQuantity: number;
   exceedsStock: boolean;
   unavailable: boolean;
+  /** 価格未定（問い合わせのみ）へ切り替えられた商品（0014） */
+  inquiryOnly: boolean;
 };
 
 export function CartItems({ lines }: { lines: CartLineView[] }) {
@@ -93,7 +95,9 @@ export function CartItems({ lines }: { lines: CartLineView[] }) {
             </div>
 
             <div className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-              {line.unavailable ? (
+              {/* 価格未定へ切り替わっただけなら商品ページは生きている。
+                  問い合わせの導線へ行けるようリンクを残す */}
+              {line.unavailable && !line.inquiryOnly ? (
                 <span className="font-medium">{line.productTitle}</span>
               ) : (
                 <Link
@@ -108,7 +112,11 @@ export function CartItems({ lines }: { lines: CartLineView[] }) {
                 <span className="text-xs text-muted">{line.optionLabel}</span>
               ) : null}
 
-              {line.unavailable ? (
+              {line.inquiryOnly ? (
+                <span className="text-xs font-bold text-danger">
+                  この商品は価格が未定になりました。商品ページからお問い合わせください。
+                </span>
+              ) : line.unavailable ? (
                 <span className="text-xs font-bold text-danger">
                   この商品は購入できなくなりました。削除してください。
                 </span>

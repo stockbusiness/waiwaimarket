@@ -887,15 +887,188 @@ select '配送先の検査関数の EXECUTE を剥がしていない', 'true',
             then 'PASS' else 'FAIL' end;
 
 -- ------------------------------------------------------------
+-- 15. 価格未定の商品と問い合わせ（0014）
+--
+-- 「問い合わせ商品は売れない」「他人のやり取りは読めない」
+-- 「言ったことは書き換えられない」の 3 つを見る。
+-- ------------------------------------------------------------
+reset role;
+
+-- テナント1 に問い合わせのみの商品を置く（承認済み＝公開されている）
+update products set pricing_mode = 'inquiry'
+ where id = 'f0000000-0000-4000-8000-000000000001';
+
+-- 既定が fixed であること。既存の商品が勝手に問い合わせ扱いにならない
+-- （0014 より前に入っていた商品は pricing_mode を指定せずに作られている）
+insert into products (id, tenant_id, title, status) values
+  ('f0000000-0000-4000-8000-00000000000d', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1',
+   '検証・販売形態の既定', 'draft');
+insert into _perm_results (item, expected, actual, verdict)
+select '販売形態の既定は fixed', 'fixed',
+       (select pricing_mode::text from products
+         where id = 'f0000000-0000-4000-8000-00000000000d'),
+       case when (select pricing_mode from products
+                   where id = 'f0000000-0000-4000-8000-00000000000d') = 'fixed'
+            then 'PASS' else 'FAIL' end;
+
+-- カートに入らない。サーバー処理（所有者）から入れても止まる
+do $$
+begin
+  perform set_config('verify.v', '拒否', false);
+  insert into cart_items (cart_id, variant_id, quantity)
+  values ('c0000000-0000-4000-8000-00000000000a',
+          'f1000000-0000-4000-8000-000000000001', 1);
+  perform set_config('verify.v', '通過', false);
+exception when others then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+insert into _perm_results (item, expected, actual, verdict)
+select '問い合わせ商品はカートに入らない', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+-- 0012 と同じで、0011 とは逆。剥がすとカート投入そのものが落ちる
+insert into _perm_results (item, expected, actual, verdict)
+select '問い合わせ判定の EXECUTE を剥がしていない', 'true',
+       has_function_privilege('authenticated', 'is_inquiry_only_variant(uuid)', 'execute')::text,
+       case when has_function_privilege('authenticated', 'is_inquiry_only_variant(uuid)', 'execute')
+            then 'PASS' else 'FAIL' end;
+
+-- 購入者1 がスレッドを立てる。スレッドと 1 通目は関数で 1 回にまとめる
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-4000-8000-000000000001';
+set request.jwt.claims = '{"sub":"00000000-0000-4000-8000-000000000001","role":"authenticated"}';
+select set_config('verify.inquiry',
+  create_product_inquiry('f0000000-0000-4000-8000-000000000001', '在庫はありますか')::text,
+  false);
+reset role;
+
+-- 発言者は auth.uid() で決まる。引数に取らないので偽れない
+set role authenticated;
+do $$
+begin
+  perform set_config('verify.v', '拒否', false);
+  insert into product_inquiry_messages (inquiry_id, sender_role, sender_id, body)
+  values (current_setting('verify.inquiry')::uuid, 'buyer',
+          '00000000-0000-4000-8000-000000000002', 'なりすまし');
+  perform set_config('verify.v', '通過', false);
+exception when others then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '他人の名前で発言できない', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+-- 購入者2 からは読めない
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-4000-8000-000000000002';
+set request.jwt.claims = '{"sub":"00000000-0000-4000-8000-000000000002","role":"authenticated"}';
+select set_config('verify.v', (select count(*)::text from product_inquiry_messages
+  where inquiry_id = current_setting('verify.inquiry')::uuid), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '別の購入者は問い合わせのやり取りを読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 他テナント（テナント2）からも読めない
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222221';
+set request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222221","role":"authenticated"}';
+select set_config('verify.v', (select count(*)::text from product_inquiries
+  where id = current_setting('verify.inquiry')::uuid), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '別のテナントは問い合わせを読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 匿名からは 1 件も見えない
+set role anon;
+set request.jwt.claim.sub = '';
+set request.jwt.claims = '{"role":"anon"}';
+select set_config('verify.v', (select count(*)::text from product_inquiries), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は問い合わせを読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 追記専用。**所有者（サーバー処理）からも止まることを見る。**
+-- 購入者として試すと、RLS に update のポリシーが無いぶん 0 行更新になり、
+-- 行が一致しないのでトリガが呼ばれない。「例外が出なかった」を
+-- 「通った」と読むと、緩めたことを検出できない
+do $$
+begin
+  perform set_config('verify.v', '拒否', false);
+  update product_inquiry_messages set body = '書き換え'
+   where inquiry_id = current_setting('verify.inquiry')::uuid;
+  perform set_config('verify.v', '通過', false);
+exception when others then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+insert into _perm_results (item, expected, actual, verdict)
+select '発言は所有者でも書き換えられない', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+do $$
+begin
+  perform set_config('verify.v', '拒否', false);
+  delete from product_inquiry_messages
+   where inquiry_id = current_setting('verify.inquiry')::uuid;
+  perform set_config('verify.v', '通過', false);
+exception when others then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+insert into _perm_results (item, expected, actual, verdict)
+select '発言は所有者でも消せない', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+-- 完了にしたら双方とも書けない
+update product_inquiries set status = 'closed'
+ where id = current_setting('verify.inquiry')::uuid;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-4000-8000-000000000001';
+set request.jwt.claims = '{"sub":"00000000-0000-4000-8000-000000000001","role":"authenticated"}';
+do $$
+begin
+  perform set_config('verify.v', '拒否', false);
+  insert into product_inquiry_messages (inquiry_id, sender_role, sender_id, body)
+  values (current_setting('verify.inquiry')::uuid, 'buyer',
+          '00000000-0000-4000-8000-000000000001', '完了後の追記');
+  perform set_config('verify.v', '通過', false);
+exception when others then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '完了した問い合わせには書き込めない', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+-- 匿名は関数そのものを呼べない（中の auth.uid() の検査と二重になる）
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は問い合わせを立てられない', 'false',
+       has_function_privilege('anon', 'create_product_inquiry(uuid,text)', 'execute')::text,
+       case when not has_function_privilege('anon', 'create_product_inquiry(uuid,text)', 'execute')
+            then 'PASS' else 'FAIL' end;
+
+-- ------------------------------------------------------------
 -- 後片付け
 -- ------------------------------------------------------------
 reset role;
+-- 発言は追記専用なので、所有者でもトリガを止めないと消せない。
+-- 検証用の行を残さないための例外で、**本番では実行しないこと**
+-- （このスクリプト全体が本番向けではない。冒頭のただし書き参照）。
+alter table product_inquiry_messages disable trigger inquiry_messages_no_delete;
+delete from product_inquiry_messages
+ where inquiry_id = current_setting('verify.inquiry', true)::uuid;
+alter table product_inquiry_messages enable trigger inquiry_messages_no_delete;
+delete from product_inquiries where id = current_setting('verify.inquiry', true)::uuid;
 delete from buyer_addresses where buyer_id in ('00000000-0000-4000-8000-000000000001',
                                                '00000000-0000-4000-8000-000000000002');
 delete from carts where id = 'c0000000-0000-4000-8000-00000000000a';
 delete from shipping_profiles where id = '50000000-0000-4000-8000-00000000000a';
 delete from product_categories where slug = 'verify-category';
-delete from products where id in ('f0000000-0000-4000-8000-000000000001',
+delete from products where id in ('f0000000-0000-4000-8000-00000000000d',
+                                  'f0000000-0000-4000-8000-000000000001',
                                   'f0000000-0000-4000-8000-000000000002',
                                   'f0000000-0000-4000-8000-000000000003',
                                   'f0000000-0000-4000-8000-000000000004');

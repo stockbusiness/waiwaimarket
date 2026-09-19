@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AddToCart } from "@/components/buyer/add-to-cart";
+import { InquiryStart } from "@/components/buyer/inquiry-start";
 import { Badge } from "@/components/ui/alert";
 import { TextLink } from "@/components/ui/button";
 import { Breadcrumb, PageHeader, PageShell, SectionHeader } from "@/components/ui/page";
-import { formatPriceRange, formatYen } from "@/lib/products/price";
+import { formatPriceFor, formatYen } from "@/lib/products/price";
 import { getPublicProduct } from "@/lib/products/public";
 import { getAudienceSession } from "@/lib/auth/session";
 
@@ -46,6 +47,12 @@ export default async function ProductDetailPage({
   // 未ログインでも商品は見せ、押した時点でログインへ送る
   const { user } = await getAudienceSession("buyer");
   const loggedIn = user !== null;
+
+  // 価格が決まっていない、または価格を公開できない商品（0014）。
+  // 購入ボタンの代わりに問い合わせボタンを出し、在庫も価格も見せない。
+  // `product_variants.price_incl_tax` には 0 が入っているが、それは
+  // 「無料」ではないので、表示は必ずこの分岐を通す
+  const inquiryOnly = product.pricingMode === "inquiry";
 
   return (
     <PageShell>
@@ -88,9 +95,9 @@ export default async function ProductDetailPage({
         description={
           <span className="flex flex-wrap items-center gap-2">
             <span className="text-lg font-bold text-body">
-              {formatPriceRange(product.price)}
+              {formatPriceFor(product.pricingMode, product.price)}
             </span>
-            {product.inStock ? null : <Badge>在庫なし</Badge>}
+            {inquiryOnly || product.inStock ? null : <Badge>在庫なし</Badge>}
           </span>
         }
       />
@@ -105,49 +112,66 @@ export default async function ProductDetailPage({
       {product.description ? (
         <section className="flex flex-col gap-3">
           <SectionHeader title="商品の説明" />
-          <p className="text-sm leading-7 whitespace-pre-wrap">{product.description}</p>
+          {/* `break-words` が無いと、説明に URL を 1 本貼られただけで
+              狭い画面が横に伸びる（0014 で問い合わせの本文を測って気づいた） */}
+          <p className="text-sm leading-7 break-words whitespace-pre-wrap">
+            {product.description}
+          </p>
         </section>
       ) : null}
 
-      <section className="flex flex-col gap-3">
-        <SectionHeader title="購入手続き" />
-        <AddToCart
-          loggedIn={loggedIn}
-          variants={product.variants.map((variant) => ({
-            id: variant.id,
-            label: variant.optionLabel ?? variant.sku,
-            priceInclTax: variant.priceInclTax,
-            inStock: variant.inStock,
-          }))}
-        />
-      </section>
+      {inquiryOnly ? (
+        <section className="flex flex-col gap-3">
+          <SectionHeader title="お問い合わせ" />
+          <p className="text-sm leading-7">
+            この商品は価格を掲載していません。ご希望の内容をお送りいただくと、
+            販売者から直接お返事します。
+          </p>
+          <InquiryStart productId={product.id} loggedIn={loggedIn} />
+        </section>
+      ) : (
+        <>
+          <section className="flex flex-col gap-3">
+            <SectionHeader title="購入手続き" />
+            <AddToCart
+              loggedIn={loggedIn}
+              variants={product.variants.map((variant) => ({
+                id: variant.id,
+                label: variant.optionLabel ?? variant.sku,
+                priceInclTax: variant.priceInclTax,
+                inStock: variant.inStock,
+              }))}
+            />
+          </section>
 
-      <section className="flex flex-col gap-3">
-        <SectionHeader title="種類と価格" />
-        {product.variants.length === 0 ? (
-          <p className="text-sm text-muted">現在販売している種類がありません。</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {product.variants.map((variant) => (
-              <li
-                key={variant.id}
-                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg border border-line bg-raised px-3 py-2.5 text-sm"
-              >
-                <span>{variant.optionLabel ?? variant.sku}</span>
-                <span className="flex items-center gap-3">
-                  <span className="font-bold">{formatYen(variant.priceInclTax)}</span>
-                  {variant.inStock ? null : (
-                    <span className="text-xs text-muted">在庫なし</span>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="text-xs leading-5 text-subtle">
-          価格は税込です。送料は購入手続きの際に計算されます。
-        </p>
-      </section>
+          <section className="flex flex-col gap-3">
+            <SectionHeader title="種類と価格" />
+            {product.variants.length === 0 ? (
+              <p className="text-sm text-muted">現在販売している種類がありません。</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {product.variants.map((variant) => (
+                  <li
+                    key={variant.id}
+                    className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg border border-line bg-raised px-3 py-2.5 text-sm"
+                  >
+                    <span>{variant.optionLabel ?? variant.sku}</span>
+                    <span className="flex items-center gap-3">
+                      <span className="font-bold">{formatYen(variant.priceInclTax)}</span>
+                      {variant.inStock ? null : (
+                        <span className="text-xs text-muted">在庫なし</span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-xs leading-5 text-subtle">
+              価格は税込です。送料は購入手続きの際に計算されます。
+            </p>
+          </section>
+        </>
+      )}
 
       {product.storeSlug ? (
         <p className="text-sm text-muted">
