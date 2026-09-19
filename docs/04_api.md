@@ -261,6 +261,29 @@ cookie を使わない経路はこの規約の対象外とする。
 公開側は API を持たず、`/legal/{slug}` のページが RLS 越しに直接読む。
 公開していないページと版は匿名から読めない。
 
+• POST /admin/api/point-rules
+
+  基本還元ルールの変更（docs/02 6.1）。本部管理者のみ。多要素認証が必要。
+
+  本体は `{ currentId, rule: { rateBasisPoints, usageCapBasisPoints,
+  confirmAfterDays, expireAfterMonths } }`。**比率は万分率の整数**
+  （1% = 100、50% = 5000）。小数で受けると `Number("0.0003")` の下振れと
+  同じ経路に乗る（`lib/points/rules.ts`）。
+
+  **上書きではなく版を積む。** 前の版に `effective_to` を入れて閉じ、
+  新しい行を足す。同じ内容を 2 回送ると版が 2 つ増えるので冪等ではない。
+  PUT ではなく POST なのはこのため。
+
+  `currentId` は「画面が読んだときに開いていた版」。ずれていれば 409
+  （`conflict`）を返してやり直させる。2 人の担当者が同時に開いていても、
+  片方の変更が黙って消えない。
+
+  負担元（`funding_source_id`）は前の版から引き継ぐ。基本還元は本部負担で
+  固定（docs/02 4.4）。
+
+  発行状況（未使用ポイント・月次の発行と利用）は API を持たず、
+  `/admin/points` が 0005 のビューを RLS 越しに直接読む。
+
 本部の機能範囲は docs/00 5.3 に定める。商品審査、カテゴリー管理、手数料率設定、
 ポイント設定、手動付与・取消などの API は、各フェーズで実装する際にここへ追記する。
 
@@ -273,6 +296,12 @@ cookie を使わない経路はこの規約の対象外とする。
 • GET /api/points/balance
 
 • GET /api/points/history
+
+  この 2 つは API を作っていない。`/points` のページが 0005 の
+  `point_balances` と台帳を RLS 越しに直接読む（`point_account_self` /
+  `point_ledger_self` が自分の行だけに絞る）。画面から呼ぶだけの GET に
+  API を挟むと、同じ絞り込みが 2 か所になる。購入者面の外から残高を
+  読む必要が出たときに足す。
 
 • POST /api/points/quote
 

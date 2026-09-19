@@ -51,6 +51,29 @@ export function parseRatio(value: string | number): number {
 }
 
 /**
+ * 画面に入力された「％」を万分率の整数にする。`"1.5" → 150`。
+ * 読めない値は null（呼び出し側が入力欄の誤りとして扱う）。
+ *
+ * **`Number(text) * 100` と書かない。** `Number("1.15") * 100` は
+ * `114.99999999999999` で、切り捨てると 114（＝1.14%）になる。
+ * 打った数字より低い還元率が黙って保存される。`parseRatio()` と同じく
+ * 文字列のまま桁を数える。
+ *
+ * 万分率で表せない細かさ（小数第 3 位以下）は受け取らない。切り捨てると
+ * 「0.005% と打ったのに 0% で保存された」が起きる。
+ */
+export function parsePercent(text: string): number | null {
+  const trimmed = text.trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return null;
+
+  const [integerPart, fractionPart = ""] = trimmed.split(".");
+  const fraction = fractionPart.padEnd(2, "0");
+  const basisPoints = Number(integerPart) * 100 + Number(fraction);
+
+  return basisPoints > BASIS_POINTS ? null : basisPoints;
+}
+
+/**
  * 注文時点のルール。`orders.point_rule_snapshot` に入れる。
  *
  * **ルール変更を既存注文に遡及適用しない**（CLAUDE.md 絶対ルール）ため、

@@ -71,6 +71,7 @@ export function BuyerHeader() {
           {[
             { href: "/cart", label: "カート" },
             { href: "/orders", label: "注文履歴" },
+            { href: "/points", label: "ポイント" },
             { href: "/inquiries", label: "問い合わせ" },
             { href: "/login", label: "ログイン" },
           ].map((item) => (
