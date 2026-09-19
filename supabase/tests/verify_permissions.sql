@@ -1051,9 +1051,132 @@ select '匿名は問い合わせを立てられない', 'false',
             then 'PASS' else 'FAIL' end;
 
 -- ------------------------------------------------------------
+-- 16. 注文の書き込み（0015）
+--
+-- 「金額はサーバーのもの」「他店の注文は触れない」「決済前の自分の注文
+-- だけ取り消せる」の 3 つを見る。
+-- ------------------------------------------------------------
+reset role;
+
+insert into orders (id, order_number, buyer_id, tenant_id, subtotal_incl_tax,
+                    shipping_fee, total_charged, shipping_address, placed_at)
+values ('0dd00000-0000-4000-8000-00000000000a', 'WM-29991231-VERIFY',
+        '00000000-0000-4000-8000-000000000001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1',
+        1000, 500, 1500,
+        '{"version":1,"recipientName":"検証","phone":"0312345678","postalCode":"1500001",
+          "prefectureCode":"13","city":"渋谷区","addressLine1":"神宮前 1-2-3"}'::jsonb,
+        now());
+
+-- テナントは状態だけ。金額はサーバーが決めたもの
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+begin
+  perform set_config('verify.v', '拒否', false);
+  update orders set total_charged = 1 where id = '0dd00000-0000-4000-8000-00000000000a';
+  perform set_config('verify.v', '通過', false);
+exception when others then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select 'テナントは注文金額を変えられない', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+-- 他店の注文は読めない
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222221';
+set request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222221","role":"authenticated"}';
+select set_config('verify.v', (select count(*)::text from orders
+  where id = '0dd00000-0000-4000-8000-00000000000a'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '別のテナントは注文を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- 他店は発送登録できない。ship_order は invoker なので RLS がそのまま効く
+set role authenticated;
+select set_config('verify.v',
+  ship_order('0dd00000-0000-4000-8000-00000000000a')::text, false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '別のテナントは発送登録できない', 'false', current_setting('verify.v'),
+       case when current_setting('verify.v') = 'false' then 'PASS' else 'FAIL' end;
+
+-- 購入者は決済前の自分の注文だけ取り消せる。
+-- **`with check` の違反は 0 件更新ではなく例外**になる。
+-- 「例外が出ない＝拒否された」と読まないこと
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-4000-8000-000000000001';
+set request.jwt.claims = '{"sub":"00000000-0000-4000-8000-000000000001","role":"authenticated"}';
+do $$
+begin
+  perform set_config('verify.v', '拒否', false);
+  update orders set status = 'paid' where id = '0dd00000-0000-4000-8000-00000000000a';
+  perform set_config('verify.v', '通過', false);
+exception when others then
+  perform set_config('verify.v', '拒否', false);
+end $$;
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '購入者は自分で決済済みにできない', '拒否', current_setting('verify.v'),
+       case when current_setting('verify.v') = '拒否' then 'PASS' else 'FAIL' end;
+
+set role authenticated;
+update orders set status = 'cancelled' where id = '0dd00000-0000-4000-8000-00000000000a';
+select set_config('verify.v', (select status::text from orders
+  where id = '0dd00000-0000-4000-8000-00000000000a'), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '購入者は決済前の注文を取り消せる', 'cancelled', current_setting('verify.v'),
+       case when current_setting('verify.v') = 'cancelled' then 'PASS' else 'FAIL' end;
+
+-- 匿名からは 1 件も見えない
+set role anon;
+set request.jwt.claim.sub = '';
+set request.jwt.claims = '{"role":"anon"}';
+select set_config('verify.v', (select count(*)::text from orders), false);
+reset role;
+insert into _perm_results (item, expected, actual, verdict)
+select '匿名は注文を読めない', '0', current_setting('verify.v'),
+       case when current_setting('verify.v') = '0' then 'PASS' else 'FAIL' end;
+
+-- サーバー処理だけが呼ぶ関数。0011 の引当関数と同じ扱いで剥がしてある
+insert into _perm_results (item, expected, actual, verdict)
+select '決済待ちを畳む関数は authenticated から剥がしてある', 'false',
+       has_function_privilege('authenticated', 'expire_pending_orders()', 'execute')::text,
+       case when not has_function_privilege('authenticated', 'expire_pending_orders()', 'execute')
+            then 'PASS' else 'FAIL' end;
+
+-- 逆に、テナント自身が呼ぶ発送登録は剥がさない（0012 の検査関数と同じ事情）
+insert into _perm_results (item, expected, actual, verdict)
+select '発送登録の EXECUTE を剥がしていない', 'true',
+       has_function_privilege('authenticated', 'ship_order(uuid,text,text)', 'execute')::text,
+       case when has_function_privilege('authenticated', 'ship_order(uuid,text,text)', 'execute')
+            then 'PASS' else 'FAIL' end;
+
+-- ------------------------------------------------------------
 -- 後片付け
 -- ------------------------------------------------------------
 reset role;
+-- **検証用テナントに紐づく注文をまとめて消す。** `orders.tenant_id` は
+-- `tenants` への外部キーなので、1 件でも残っていると下の
+-- `delete from tenants` が落ちる。そこで後片付けが止まると、次に実行した
+-- ときテナントだけが残った状態から始まり、商品も店舗も作れずに
+-- 無関係な項目がいくつも FAIL する（実際に踏んだ）。
+delete from shipments where order_id in (
+  select id from orders where tenant_id in ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1',
+                                            'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1',
+                                            'cccccccc-cccc-cccc-cccc-ccccccccccc1'));
+delete from inventory_reservations where order_id in (
+  select id from orders where tenant_id in ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1',
+                                            'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1',
+                                            'cccccccc-cccc-cccc-cccc-ccccccccccc1'));
+-- order_items は cascade で消える（0001）
+delete from orders where tenant_id in ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1',
+                                       'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1',
+                                       'cccccccc-cccc-cccc-cccc-ccccccccccc1');
 -- 発言は追記専用なので、所有者でもトリガを止めないと消せない。
 -- 検証用の行を残さないための例外で、**本番では実行しないこと**
 -- （このスクリプト全体が本番向けではない。冒頭のただし書き参照）。

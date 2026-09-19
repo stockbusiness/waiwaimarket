@@ -54,6 +54,12 @@ export function BuyerHeader() {
             カート
           </Link>
           <Link
+            href="/orders"
+            className="rounded-sm text-sm font-medium text-muted hover:text-body"
+          >
+            注文履歴
+          </Link>
+          <Link
             href="/inquiries"
             className="rounded-sm text-sm font-medium text-muted hover:text-body"
           >

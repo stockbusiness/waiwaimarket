@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
@@ -40,12 +41,43 @@ export function CheckoutStart({
   cartId: string;
   addresses: AddressView[];
 }) {
+  const router = useRouter();
   const [addressId, setAddressId] = useState(
     addresses.find((a) => a.isDefault)?.id ?? addresses[0]?.id ?? "",
   );
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  /**
+   * 注文を確定する。
+   *
+   * **プレビューの金額を送らない。** サーバーがもう一度引き直す
+   * （CLAUDE.md「クライアントから来た金額を信用しない」）。画面を経由して
+   * 戻ってきた値は、元がサーバー由来でもクライアント由来と同じ扱いにする。
+   */
+  async function confirm() {
+    setError(null);
+    setBusy(true);
+
+    const response = await fetch("/api/market/orders", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ cartId, addressId }),
+    });
+
+    setBusy(false);
+
+    if (!response.ok) {
+      setError(await readApiError(response, "注文を確定できませんでした"));
+      // 引当が切れていたら、古い金額のまま確定させない
+      setPreview(null);
+      return;
+    }
+
+    const created = (await response.json()) as { orderId: string };
+    router.push(`/orders/${created.orderId}`);
+  }
 
   async function start() {
     setError(null);
@@ -143,9 +175,15 @@ export function CheckoutStart({
             送料はこの金額で確定です。
           </Alert>
 
-          {/* 決済はフェーズ3 の Stripe 接続と一緒に入る。導線はまだ置かない */}
-          <p className="text-sm text-muted">
-            お支払いは準備中です。決済の接続が終わり次第ご利用いただけます。
+          <Button type="button" onClick={confirm} disabled={busy} className="w-full">
+            {busy ? "確定中…" : "この内容で注文する"}
+          </Button>
+
+          {/* 決済の接続はフェーズ3-3。注文は「決済待ち」で作られる */}
+          <p className="text-xs leading-5 text-subtle">
+            お支払いの手続きは準備中です。ご注文は「お支払い前」の状態で承ります。
+            在庫の確保期限を過ぎると自動的に取り消されますので、決済の準備が整い次第
+            あらためてご案内します。
           </p>
         </div>
       ) : (
